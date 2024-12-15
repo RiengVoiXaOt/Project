@@ -1,0 +1,167 @@
+--------------------------------------Relay
+if __name__ == "__main__":
+    relay_control = RelayControl()
+
+    # Bật relay
+    relay_control.toggle_relay(True)
+
+    # Tắt relay
+    relay_control.toggle_relay(False)
+    
+-----------------------------servo
+from servo_control import ServoControl
+
+# Khởi tạo đối tượng ServoControl
+servo_control = ServoControl()
+
+# Di chuyển servo trên đến vị trí 0.5
+servo_control.move_servo("top", 0.5)
+
+# Di chuyển servo dưới đến vị trí -0.5
+servo_control.move_servo("bottom", -0.5)
+
+# Đặt lại cả hai servo về vị trí mặc định
+servo_control.reset_servos()
+
+--------------------------------water
+from water_level_sensor import WaterLevelSensor
+
+# Khởi tạo cảm biến mực nước
+water_sensor = WaterLevelSensor()
+
+# Kiểm tra trạng thái mực nước
+if water_sensor.is_water_present():
+    print("Water detected!")
+else:
+    print("No water detected!")
+
+-------------------------time manager
+if __name__ == "__main__":
+    active_hours = [(7, 8), (14, 15)]  # Robot hoạt động từ 7-8 giờ sáng và 14-15 giờ chiều
+    manager = TimeManager(work_time=30, rest_time=60, active_hours=active_hours)
+
+    while True:
+        manager.manage_schedule()
+
+        # Giả sử nhiệm vụ hoàn thành, chạy relay trong 10 giây cho nhiệm vụ tưới cây
+        manager.run_relay_for_duration(10)
+
+        if manager.check_task_time():
+            print("Task completed. Robot resting.")
+            break
+---------------------color
+import cv2
+from queue import Queue
+from threading import Event
+from your_module import color_detection_loop  # Thay bằng đường dẫn đúng của module
+
+# Khởi tạo video stream
+video_capture = cv2.VideoCapture(0)
+frame_queue = Queue(maxsize=1)
+stop_event = Event()
+
+# Thông số cho color detection
+center_x, center_y = 320, 240  # Trung tâm khung hình (giả sử kích thước là 640x480)
+min_box_area = 500
+
+# Bắt đầu luồng nhận diện màu sắc
+color_detection_loop(video_capture, center_x, center_y, min_box_area, stop_event, frame_queue)
+
+# Xử lý dữ liệu từ frame_queue trong vòng lặp chính (nếu cần)
+while not stop_event.is_set():
+    if not frame_queue.empty():
+        frame, mask_red, mask_black, _ = frame_queue.get()
+        cv2.imshow("Frame", frame)
+        cv2.imshow("Red Mask", mask_red)
+        cv2.imshow("Black Mask", mask_black)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        stop_event.set()
+        break
+
+cv2.destroyAllWindows()
+video_capture.release()
+
+
+-----------------------------object
+from threading import Event
+from queue import Queue
+from your_module import object_detection_loop  # Thay bằng đường dẫn đúng của module
+import cv2
+
+# Khởi tạo video stream
+video_capture = cv2.VideoCapture(0)
+frame_queue = Queue(maxsize=1)
+stop_event = Event()
+
+# Bắt đầu luồng nhận diện đối tượng
+object_detection_loop(video_capture, stop_event, frame_queue)
+
+# Xử lý dữ liệu từ frame_queue
+while not stop_event.is_set():
+    if not frame_queue.empty():
+        _, _, _, frame_with_detections = frame_queue.get()
+        cv2.imshow("Object Detection", frame_with_detections)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        stop_event.set()
+        break
+
+cv2.destroyAllWindows()
+video_capture.release()
+
+------------------------------------------Cả 2
+from threading import Thread, Event
+from queue import Queue
+import cv2
+from your_module import color_detection_loop, object_detection_loop
+
+# Khởi tạo video stream
+video_capture = cv2.VideoCapture(0)
+frame_queue_color = Queue(maxsize=1)
+frame_queue_object = Queue(maxsize=1)
+stop_event = Event()
+
+# Thông số cho color detection
+center_x, center_y = 320, 240
+min_box_area = 500
+
+# Tạo và bắt đầu các luồng
+color_thread = Thread(target=color_detection_loop, args=(video_capture, center_x, center_y, min_box_area, stop_event, frame_queue_color))
+object_thread = Thread(target=object_detection_loop, args=(video_capture, stop_event, frame_queue_object))
+
+color_thread.start()
+object_thread.start()
+
+# Hiển thị kết quả từ cả hai
+while not stop_event.is_set():
+    if not frame_queue_color.empty():
+        frame, mask_red, mask_black, _ = frame_queue_color.get()
+        cv2.imshow("Color Frame", frame)
+        cv2.imshow("Red Mask", mask_red)
+        cv2.imshow("Black Mask", mask_black)
+    
+    if not frame_queue_object.empty():
+        _, _, _, frame_with_detections = frame_queue_object.get()
+        cv2.imshow("Object Detection", frame_with_detections)
+    
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        stop_event.set()
+        break
+
+cv2.destroyAllWindows()
+video_capture.release()
+color_thread.join()
+object_thread.join()
+
+
+-------------------------logger
+from logger import Logger
+
+# Khởi tạo logger
+logger = Logger()
+
+# Ghi thông tin
+logger.log_info("Robot started.")
+logger.log_warning("Low battery warning.")
+logger.log_error("Obstacle detection failed.")
+logger.log_critical("Critical system error. Shutting down.")
+logger.log_debug("Motor control debug info.")

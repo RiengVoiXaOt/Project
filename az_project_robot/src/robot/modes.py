@@ -104,34 +104,36 @@ class Modes:
 
     def avoid_obstacles(self):
         """
-        Hàm tránh vật cản dựa trên cảm biến siêu âm, sử dụng set_motors_direction.
-        Cải tiến với logic phức tạp và lưu trữ dữ liệu lịch sử.
+        Hàm tránh vật cản được cải tiến.
         """
         # Đọc khoảng cách từ cảm biến
         front_distance = self.ultrasonic_sensors.get_distance("front")
         left_distance = self.ultrasonic_sensors.get_distance("left")
         right_distance = self.ultrasonic_sensors.get_distance("right")
 
-        # Kiểm tra nếu bất kỳ cảm biến nào trả về None
+        # Kiểm tra dữ liệu cảm biến
         if front_distance is None or left_distance is None or right_distance is None:
-            print("Ultrasonic sensor error: Missing distance data.")
+            print("Lỗi cảm biến siêu âm: Không nhận được dữ liệu.")
             set_motors_direction(self.robot, "stop", 0, 0, 0)
             return
 
         print(f"Distances - Front: {front_distance} cm, Left: {left_distance} cm, Right: {right_distance}")
 
-        # Lưu trữ khoảng cách vào lịch sử
+        # Lưu lịch sử khoảng cách
         if not hasattr(self, 'distance_history'):
             self.distance_history = {'front': [], 'left': [], 'right': []}
-        
         self.distance_history['front'].append(front_distance)
         self.distance_history['left'].append(left_distance)
         self.distance_history['right'].append(right_distance)
 
-        # Xác định trạng thái của cảm biến
-        f_state = 1 if front_distance < 15 else 0
-        l_state = 1 if left_distance < 15 else 0
-        r_state = 1 if right_distance < 15 else 0
+        # Cấu hình tham số động
+        SAFE_DISTANCE = 15  # Khoảng cách an toàn (cm)
+        CRITICAL_DISTANCE = 12  # Ngưỡng cảnh báo (cm)
+        
+        # Xác định trạng thái cảm biến
+        f_state = 1 if front_distance < SAFE_DISTANCE else 0
+        l_state = 1 if left_distance < SAFE_DISTANCE else 0
+        r_state = 1 if right_distance < SAFE_DISTANCE else 0
 
         if f_state == 0:
             # Không có chướng ngại phía trước
@@ -145,64 +147,60 @@ class Modes:
                 set_motors_direction(self.robot, "go_right", self.vx, self.vy, 0)
                 print("Đi phải")
             else:
-                # Điều chỉnh đi chéo nếu có vật cản bên trái hoặc phải
                 direction = 'diagonal_up_right' if l_state == 1 else 'diagonal_up_left'
                 set_motors_direction(self.robot, direction, self.vx, self.vy, 0)
                 print(f"Đi chéo lên {'phải' if l_state == 1 else 'trái'}")
-
         else:
             # Có vật cản phía trước
-            if front_distance <= 12:
+            if front_distance <= CRITICAL_DISTANCE:
                 set_motors_direction(self.robot, "go_backward", self.vx, self.vy, 0)
                 print("Lùi lại để tránh vật cản")
                 return
 
-            # Lựa chọn hướng xoay dựa trên trạng thái cảm biến
             if l_state == 0 and r_state == 0:
-                # Nếu không có vật cản bên trái và bên phải
-                if front_distance >= 10:
-                    if right_distance > left_distance:
-                        self.rotate_robot('rotate_right')
-                    else:
-                        self.rotate_robot('rotate_left')
+                # Không có vật cản hai bên
+                if right_distance > left_distance:
+                    self.rotate_robot('rotate_right')
+                else:
+                    self.rotate_robot('rotate_left')
             elif l_state == 1 and r_state == 0:
                 self.rotate_robot('rotate_right')
             elif r_state == 1 and l_state == 0:
                 self.rotate_robot('rotate_left')
             elif l_state == 1 and r_state == 1:
-                # Nếu cả hai bên đều có vật cản, chọn bên nào có khoảng cách xa hơn để quay
+                # Nếu cả trái và phải đều có vật cản, chọn hướng quay hoặc lùi lại
                 if right_distance > left_distance:
                     self.rotate_robot('rotate_right')
                 else:
                     self.rotate_robot('rotate_left')
+                # Nếu vẫn không thể thoát, lùi và xoay 180 độ
+                print("Cả ba hướng đều bị chặn, lùi lại và xoay 180 độ.")
+                set_motors_direction(self.robot, "go_backward", self.vx, self.vy, 0)
+                time.sleep(1)  # Lùi một khoảng ngắn
+                self.rotate_robot('rotate_right', angle=180)
 
-    def rotate_robot(self, direction):
+    def rotate_robot(self, direction, angle=90):
         """
-        Hàm xoay robot theo hướng chỉ định.
+        Hàm xoay robot được cải tiến với góc xoay tùy chọn.
         """
-        max_rotate_time = 3  # Giới hạn thời gian xoay (giây)
+        max_rotate_time = angle / 90 * 3  # Thời gian xoay tương ứng với góc
         rotate_start_time = time.time()
 
         while time.time() - rotate_start_time < max_rotate_time:
             front_distance = self.ultrasonic_sensors.get_distance("front")
-            left_distance = self.ultrasonic_sensors.get_distance("left")
-            right_distance = self.ultrasonic_sensors.get_distance("right")
 
-            print(f"Khoảng cách: Trước {front_distance}, Trái {left_distance}, Phải {right_distance}")
+            print(f"Khoảng cách trước: {front_distance} cm")
             set_motors_direction(self.robot, direction, self.vx, self.vy, 0)
-            print(f"Xoay {'phải' if direction == 'rotate_right' else 'trái'}")
+            print(f"Xoay {'phải' if direction == 'rotate_right' else 'trái'} góc {angle} độ")
 
-            # Điều kiện thoát vòng lặp
-            if front_distance >= 1.5 * 15:  # Nếu khoảng cách phía trước an toàn
+            if front_distance >= 1.5 * 15:
                 set_motors_direction(self.robot, 'stop', 0, 0, 0)
-                print("Dừng xoay")
+                print("Dừng xoay do khoảng cách phía trước an toàn.")
                 break
+            time.sleep(0.1)  # Giảm tải vòng lặp, đọc cảm biến mỗi 0.1 giây
         else:
-            # Nếu vượt quá thời gian, chuyển sang phương án khác
+            print("Hết thời gian xoay, lùi lại.")
             set_motors_direction(self.robot, 'go_backward', self.vx, self.vy, 0)
-            print("Thay đổi hướng bằng cách lùi")
-
-
 
     def find_objects(self):
         # Gọi hàm để tìm kiếm vật thể

@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, time
 from src.hardware.relay import RelayControl
 from src.hardware.servos import ServoControl
 from src.hardware.motors import Motors
@@ -8,6 +8,7 @@ from src.vision.object_detection import object_detection_loop
 from src.utils.control_utils import getch, direction, set_motors_direction
 from src.hardware.servos import ServoControl
 from src.hardware.kinematic import Kinematic
+import numpy as np
 
 """
 Robot sẽ có hai chế độ hoạt động chính:
@@ -29,7 +30,7 @@ b. Chế Độ Thủ Công
 """
 
 class Modes:
-    def __init__(self, n = 5, theta = 0):
+    def __init__(self, n = None, theta = None):
         self.relay_control = RelayControl(5)
         self.servo_control = ServoControl()
         self.motors = Motors()
@@ -37,6 +38,10 @@ class Modes:
         self.manual_mode = False
         self.is_watering = False
         self.charge_station_found = False
+        if n == None:
+            n = 5
+        if theta == None:
+            theta = 0
         self.n = n  # Khởi tạo biến tốc độ
         self.speed = 0.04309596457 # 10% vận tốc của động cơ tương ứng với 0.1
         self.vx = n * self.speed
@@ -56,6 +61,7 @@ class Modes:
             print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, u to move servo up, i to move servo down, p to quit): ")
             command = getch()
             if command == 'p':
+                self.servo_control.reset_servos()
                 print("Exiting manual control.")
                 return
             elif command in ['+', '=']:
@@ -75,9 +81,9 @@ class Modes:
             elif command == 'r':
                 self.relay_control.run_relay_for_duration()
             elif command == 'u':
-                self.servo_control.move_servo_up("top")
+                self.servo_control.move_servo_up("bottom")
             elif command == 'i':
-                self.servo_control.move_servo_down("top")
+                self.servo_control.move_servo_down("bottom")
 
     def automatic_mode(self):
         while not self.manual_mode:
@@ -97,18 +103,106 @@ class Modes:
         print("Finished watering plants.")
 
     def avoid_obstacles(self):
-        distance_front = self.ultrasonic_sensors.get_distance("front")
-        distance_left = self.ultrasonic_sensors.get_distance("left")
-        distance_right = self.ultrasonic_sensors.get_distance("right")
+        """
+        Hàm tránh vật cản dựa trên cảm biến siêu âm, sử dụng set_motors_direction.
+        Cải tiến với logic phức tạp và lưu trữ dữ liệu lịch sử.
+        """
+        # Đọc khoảng cách từ cảm biến
+        front_distance = self.ultrasonic_sensors.get_distance("front")
+        left_distance = self.ultrasonic_sensors.get_distance("left")
+        right_distance = self.ultrasonic_sensors.get_distance("right")
 
-        if distance_front < 20:  # Nếu có vật cản phía trước
-            print("Obstacle detected in front!")
-            # Logic tránh chướng ngại vật
-            if distance_left > distance_right:
-                self.turn_right()  # Quay phải
+        # Kiểm tra nếu bất kỳ cảm biến nào trả về None
+        if front_distance is None or left_distance is None or right_distance is None:
+            print("Ultrasonic sensor error: Missing distance data.")
+            set_motors_direction(self.robot, "stop", 0, 0, 0)
+            return
+
+        print(f"Distances - Front: {front_distance} cm, Left: {left_distance} cm, Right: {right_distance}")
+
+        # Lưu trữ khoảng cách vào lịch sử
+        if not hasattr(self, 'distance_history'):
+            self.distance_history = {'front': [], 'left': [], 'right': []}
+        
+        self.distance_history['front'].append(front_distance)
+        self.distance_history['left'].append(left_distance)
+        self.distance_history['right'].append(right_distance)
+
+        # Xác định trạng thái của cảm biến
+        f_state = 1 if front_distance < 15 else 0
+        l_state = 1 if left_distance < 15 else 0
+        r_state = 1 if right_distance < 15 else 0
+
+        if f_state == 0:
+            # Không có chướng ngại phía trước
+            if l_state == 0 and r_state == 0:
+                set_motors_direction(self.robot, "go_forward", self.vx, self.vy, 0)
+                print("Đi thẳng")
+            elif r_state == 1:
+                set_motors_direction(self.robot, "go_left", self.vx, self.vy, 0)
+                print("Đi trái")
+            elif l_state == 1:
+                set_motors_direction(self.robot, "go_right", self.vx, self.vy, 0)
+                print("Đi phải")
             else:
-                self.turn_left()  # Quay trái
-            sleep(1)  # Chờ một chút trước khi kiểm tra lại
+                # Điều chỉnh đi chéo nếu có vật cản bên trái hoặc phải
+                direction = 'diagonal_up_right' if l_state == 1 else 'diagonal_up_left'
+                set_motors_direction(self.robot, direction, self.vx, self.vy, 0)
+                print(f"Đi chéo lên {'phải' if l_state == 1 else 'trái'}")
+
+        else:
+            # Có vật cản phía trước
+            if front_distance <= 12:
+                set_motors_direction(self.robot, "go_backward", self.vx, self.vy, 0)
+                print("Lùi lại để tránh vật cản")
+                return
+
+            # Lựa chọn hướng xoay dựa trên trạng thái cảm biến
+            if l_state == 0 and r_state == 0:
+                # Nếu không có vật cản bên trái và bên phải
+                if front_distance >= 10:
+                    if right_distance > left_distance:
+                        self.rotate_robot('rotate_right')
+                    else:
+                        self.rotate_robot('rotate_left')
+            elif l_state == 1 and r_state == 0:
+                self.rotate_robot('rotate_right')
+            elif r_state == 1 and l_state == 0:
+                self.rotate_robot('rotate_left')
+            elif l_state == 1 and r_state == 1:
+                # Nếu cả hai bên đều có vật cản, chọn bên nào có khoảng cách xa hơn để quay
+                if right_distance > left_distance:
+                    self.rotate_robot('rotate_right')
+                else:
+                    self.rotate_robot('rotate_left')
+
+    def rotate_robot(self, direction):
+        """
+        Hàm xoay robot theo hướng chỉ định.
+        """
+        max_rotate_time = 3  # Giới hạn thời gian xoay (giây)
+        rotate_start_time = time.time()
+
+        while time.time() - rotate_start_time < max_rotate_time:
+            front_distance = self.ultrasonic_sensors.get_distance("front")
+            left_distance = self.ultrasonic_sensors.get_distance("left")
+            right_distance = self.ultrasonic_sensors.get_distance("right")
+
+            print(f"Khoảng cách: Trước {front_distance}, Trái {left_distance}, Phải {right_distance}")
+            set_motors_direction(self.robot, direction, self.vx, self.vy, 0)
+            print(f"Xoay {'phải' if direction == 'rotate_right' else 'trái'}")
+
+            # Điều kiện thoát vòng lặp
+            if front_distance >= 1.5 * 15:  # Nếu khoảng cách phía trước an toàn
+                set_motors_direction(self.robot, 'stop', 0, 0, 0)
+                print("Dừng xoay")
+                break
+        else:
+            # Nếu vượt quá thời gian, chuyển sang phương án khác
+            set_motors_direction(self.robot, 'go_backward', self.vx, self.vy, 0)
+            print("Thay đổi hướng bằng cách lùi")
+
+
 
     def find_objects(self):
         # Gọi hàm để tìm kiếm vật thể

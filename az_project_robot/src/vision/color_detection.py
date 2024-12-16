@@ -1,6 +1,6 @@
 import cv2
 import time
-from utils.image_utils import (
+from src.utils.image_utils import (
     process_frame,
     analyze_contours,
     display_info,

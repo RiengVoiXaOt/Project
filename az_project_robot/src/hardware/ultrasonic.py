@@ -1,4 +1,4 @@
-from config.gpio_config import F_SENSOR, L_SENSOR, R_SENSOR  # Nhập các cảm biến siêu âm từ mô-đun gpio_config
+from src.config.gpio_config import F_SENSOR, L_SENSOR, R_SENSOR  # Nhập các cảm biến siêu âm từ mô-đun gpio_config
 
 class UltrasonicSensors:
     def __init__(self):

@@ -1,4 +1,4 @@
-from config.gpio_config import MOTORS  # Nhập cấu hình động cơ từ mô-đun gpio_config
+from src.config.gpio_config import MOTORS  # Nhập cấu hình động cơ từ mô-đun gpio_config
 
 class Motors:
     def __init__(self):
@@ -11,7 +11,7 @@ class Motors:
 
     def set_speed(self, motor, speed):
         # Thiết lập tốc độ cho động cơ
-        self.motors[motor]["en"].value = max(0, min(speed, 1))  # Giới hạn tốc độ từ 0 đến 1
+        self.motors[motor]["enable"].value = max(0, min(speed, 1))  # Giới hạn tốc độ từ 0 đến 1
 
     def stop_all(self):
         # Dừng tất cả các động cơ

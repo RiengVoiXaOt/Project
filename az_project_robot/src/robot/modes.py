@@ -1,13 +1,13 @@
 from time import sleep
-from hardware.relay import RelayControl
-from hardware.servos import ServoControl
-from hardware.motors import Motors
-from hardware.ultrasonic import UltrasonicSensors
-from vision.color_detection import color_detection_loop
-from vision.object_detection import object_detection_loop
-from utils.control_utils import getch, direction, set_motors_direction
-from hardware.servos import ServoControl
-from hardware.kinematic import Kinematic
+from src.hardware.relay import RelayControl
+from src.hardware.servos import ServoControl
+from src.hardware.motors import Motors
+from src.hardware.ultrasonic import UltrasonicSensors
+from src.vision.color_detection import color_detection_loop
+from src.vision.object_detection import object_detection_loop
+from src.utils.control_utils import getch, direction, set_motors_direction
+from src.hardware.servos import ServoControl
+from src.hardware.kinematic import Kinematic
 
 """
 Robot sẽ có hai chế độ hoạt động chính:
@@ -29,8 +29,8 @@ b. Chế Độ Thủ Công
 """
 
 class Modes:
-    def __init__(self, n, vx, vy, theta):
-        self.relay_control = RelayControl()
+    def __init__(self, n = 5, theta = 0):
+        self.relay_control = RelayControl(5)
         self.servo_control = ServoControl()
         self.motors = Motors()
         self.ultrasonic_sensors = UltrasonicSensors()
@@ -39,8 +39,8 @@ class Modes:
         self.charge_station_found = False
         self.n = n  # Khởi tạo biến tốc độ
         self.speed = 0.04309596457 # 10% vận tốc của động cơ tương ứng với 0.1
-        self.vx = vx
-        self.vy = vy
+        self.vx = n * self.speed
+        self.vy = n * self.speed
         self.theta = theta
         self.robot = Kinematic(0, 0, 0, 0 )
         
@@ -49,11 +49,11 @@ class Modes:
         mode = "manual" if self.manual_mode else "automatic"
         print(f"Switched to {mode} mode.")
         if self.manual_mode:
-            Motors.stop_all()  # Dừng tất cả động cơ khi chuyển sang chế độ thủ công
+            self.motors.stop_all()  # Dừng tất cả động cơ khi chuyển sang chế độ thủ công
 
     def manual_control(self):
         while self.manual_mode:
-            print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, u to move servo up, d to move servo down, p to quit): ")
+            print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, u to move servo up, i to move servo down, p to quit): ")
             command = getch()
             if command == 'p':
                 print("Exiting manual control.")
@@ -71,20 +71,13 @@ class Modes:
             elif command in direction:
                 current_direction = direction[command]
                 print("Direction: " + current_direction)
-                set_motors_direction(self, self.robot, current_direction, self.vx, self.vy, self.theta)
+                set_motors_direction(self.robot, current_direction, self.vx, self.vy, self.theta)
             elif command == 'r':
-                self.toggle_relay()
+                self.relay_control.run_relay_for_duration()
             elif command == 'u':
-                self.servo_control.move_up()
-            elif command == 'd':
-                self.servo_control.move_down()
-
-    def toggle_relay(self):
-        self.relay_control.toggle_relay(True)
-        print("Relay is ON")
-        sleep(2)  # Relay bật trong 2 giây
-        self.relay_control.toggle_relay(False)
-        print("Relay is OFF")
+                self.servo_control.move_servo_up("top")
+            elif command == 'i':
+                self.servo_control.move_servo_down("top")
 
     def automatic_mode(self):
         while not self.manual_mode:

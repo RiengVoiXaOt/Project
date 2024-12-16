@@ -2,7 +2,7 @@ import os
 import cv2
 from tensorflow.lite.python.interpreter import Interpreter # type: ignore
 from queue import Queue
-from utils.image_utils import (
+from src.utils.image_utils import (
     load_labels,
     load_model,
     get_model_details,
@@ -22,7 +22,7 @@ def object_detection_loop(videostream, stop_event, frame_queue):
     - Vẽ các bounding box cho các đối tượng phát hiện được.
     """
     # Định nghĩa các tham số và đường dẫn đến mô hình
-    MODEL_NAME = 'C:\Users\phong\Desktop\az_project_robot\models'
+    MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
     GRAPH_NAME = 'detect.tflite'
     LABELMAP_NAME = 'labelmap.txt'
     min_conf_threshold = 0.7

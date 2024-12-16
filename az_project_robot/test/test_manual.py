@@ -1,5 +1,4 @@
 from src.hardware.motors import Motors
-from src.utils.control_utils import getch, direction, set_motors_direction
 from src.robot.modes import Modes
 from src.robot.tasks import Tasks
 from src.utils.logger import Logger

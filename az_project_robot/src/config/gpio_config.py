@@ -1,4 +1,4 @@
-from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor, Servo # type: ignore
+from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor, AngularServo # type: ignore
 
 # === Motor Configuration ===
 # Cấu hình các động cơ với các chân GPIO tương ứng
@@ -19,26 +19,23 @@ MOTORS = {
         "enable": PWMOutputDevice(12)         # Chân GPIO để điều khiển tốc độ động cơ 3
     },
     "motor_4": {
-        "forward": DigitalOutputDevice(26),  # Chân GPIO cho động cơ 4 quay tới
-        "backward": DigitalOutputDevice(19), # Chân GPIO cho động cơ 4 quay lùi
+        "forward": DigitalOutputDevice(19),  # Chân GPIO cho động cơ 4 quay tới
+        "backward": DigitalOutputDevice(26), # Chân GPIO cho động cơ 4 quay lùi
         "enable": PWMOutputDevice(13)         # Chân GPIO để điều khiển tốc độ động cơ 4
     }
 }
 
 # === Servo Configuration ===
 # Cấu hình các servo với chân GPIO tương ứng
-SERVOS = {
-    "servo_1": Servo(14),  # Servo dưới
-    "servo_2": Servo(15)   # Servo trên
-}
+servo_1 = AngularServo(15, min_angle=0, max_angle=180, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000)
+servo_2 = AngularServo(14, min_angle=0, max_angle=180, min_pulse_width=0.5/1000, max_pulse_width=2.4/1000)   # Servo trên
 
 # === Ultrasonic Sensor Configuration ===
 # Cấu hình các cảm biến siêu âm với chân GPIO cho echo và trigger
-ULTRASONIC_SENSORS = {
-    "front": DistanceSensor(echo=11, trigger=9),    # Cảm biến siêu âm phía trước
-    "left": DistanceSensor(echo=27, trigger=17),     # Cảm biến siêu âm phía trái
-    "right": DistanceSensor(echo=24, trigger=23)     # Cảm biến siêu âm phía phải
-}
+# === Ultrasonic Sensor Configuration ===
+F_SENSOR = DistanceSensor(echo=11, trigger=9)    # Cảm biến phía trước
+L_SENSOR = DistanceSensor(echo=27, trigger=17)   # Cảm biến bên trái
+R_SENSOR = DistanceSensor(echo=24, trigger=23)   # Cảm biến bên phải
 
 # === Relay Configuration ===
 # Cấu hình relay với chân GPIO tương ứng

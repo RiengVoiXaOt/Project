@@ -1,8 +1,8 @@
 import numpy as np
-from hardware.motors import Motors
+from src.hardware.motors import Motors
 
 class Kinematic:
-    def __init__(self, x, y, d, t, motors: Motors):
+    def __init__(self, x, y, d, t, motors: Motors = None):
         """
         Khởi tạo động học của robot 4 bánh xe đa hướng.
         :param x: Tốc độ trục x toàn cục.
@@ -11,6 +11,9 @@ class Kinematic:
         :param t: Chế độ quay (0: không quay, 1: quay).
         :param motors: Đối tượng Motors để điều khiển động cơ.
         """
+        if motors is None:
+            motors = Motors()  # Gán giá trị mặc định cho motors nếu không có tham số
+        
         self.motors = motors
         self.turn = t
         self.x = x

@@ -1,5 +1,5 @@
 from gpiozero import DigitalInputDevice # type: ignore
-from config.gpio_config import WATER_LEVEL_SENSOR  # Nhập cấu hình từ gpio_config
+from src.config.gpio_config import WATER_LEVEL_SENSOR  # Nhập cấu hình từ gpio_config
 
 class WaterLevelSensor:
     def __init__(self):

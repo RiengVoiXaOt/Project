@@ -1,5 +1,5 @@
-from hardware.time_manager import TimeManager
-from modes import Modes
+from src.hardware.time_manager import TimeManager
+from src.robot.modes import Modes
 from time import sleep
 
 """

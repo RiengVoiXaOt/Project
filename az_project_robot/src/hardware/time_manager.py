@@ -1,19 +1,20 @@
 import time
-from relay import RelayControl  # Import RelayControl để điều khiển relay
+from src.hardware.relay import RelayControl  # Import RelayControl để điều khiển relay
 from datetime import datetime
 
 
 class TimeManager:
-    def __init__(self, work_time, rest_time):
+    def __init__(self, work_time, rest_time, active_hours=None):
         """
         Quản lý thời gian làm việc và nghỉ ngơi của hệ thống.
         :param work_time: Thời gian làm việc (giây).
         :param rest_time: Thời gian nghỉ ngơi (giây).
+        :param active_hours: Danh sách các khoảng thời gian hoạt động (giờ bắt đầu, giờ kết thúc).
         """
         self.work_time = work_time
         self.rest_time = rest_time
-        # Đặt khoảng thời gian hoạt động từ 6h-7h và 14h-15h
-        self.active_hours = [(6, 7), (14, 15)]
+        # Nếu không có active_hours, sử dụng mặc định là [(6, 7), (14, 15)]
+        self.active_hours = active_hours if active_hours else [(6, 7), (14, 15)]
         self.start_time = None
         self.relay_control = RelayControl()  # Tạo đối tượng RelayControl
         self.relay_start_time = None
@@ -44,7 +45,6 @@ class TimeManager:
             time.sleep(self.rest_time)  # Nghỉ ngơi trong thời gian nghỉ
         else:
             print("Hệ thống không hoạt động vào thời gian này.")
-
 
     def start_task(self):
         """
@@ -78,21 +78,14 @@ class TimeManager:
         Tính toán thời gian nghỉ ngơi còn lại.
         :return: Thời gian nghỉ ngơi còn lại (giây).
         """
+        if self.start_time is None:
+            print("Task not started yet.")
+            return self.rest_time  # Nếu chưa bắt đầu nhiệm vụ, toàn bộ thời gian nghỉ ngơi còn lại
+
         elapsed = time.time() - self.start_time
         remaining_rest = max(0, self.rest_time - elapsed)
         print(f"Remaining rest time: {remaining_rest} seconds.")
         return remaining_rest
-
-    def run_relay_for_duration(self, duration):
-        """
-        Bật relay trong một khoảng thời gian nhất định.
-        :param duration: Thời gian bật relay (giây).
-        """
-        print(f"Relay turned on for {duration} seconds.")
-        self.relay_control.toggle_relay(True)
-        time.sleep(duration)
-        self.relay_control.toggle_relay(False)
-        print("Relay turned off.")
 
     def is_within_active_hours(self):
         """
@@ -115,4 +108,4 @@ class TimeManager:
         else:
             print("Robot is outside active hours. Entering rest mode.")
             remaining_time = self.calculate_rest_time()
-            time.sleep(remaining_time)
+            time.sleep(remaining_time)  # Nghỉ cho đến khi hoạt động tiếp tục

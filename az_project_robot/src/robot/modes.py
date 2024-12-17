@@ -95,36 +95,37 @@ class Modes:
         """Chế độ tự động cho robot thực hiện nhiệm vụ."""
         print("Chế độ tự động đang chạy...")
 
-        while self.mode == 'automatic':
-            # Kiểm tra liên tục đường line màu đen
+        while not self.manual_mode:  # Vòng lặp chạy khi ở chế độ tự động
+            # Kiểm tra đường line màu đen và điều chỉnh hướng nếu cần
             if self.sensors.detect_line_black():
                 print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
-                self.adjust_direction()  # Điều chỉnh hướng để không đi qua đường line màu đen
-                continue  # Quay lại đầu vòng lặp
-
-            # Nếu không phát hiện đường line màu đen, tiếp tục các nhiệm vụ khác
-            if not self.is_watering:
-                self.water_plants()  # Tưới cây nếu chưa tưới
-
-            self.avoid_obstacles()  # Tránh chướng ngại vật
-
-            # Kiểm tra đường line màu đen trước khi tìm kiếm vật thể
-            if self.sensors.detect_line_black():
-                print("Phát hiện đường line màu đen trong khi tìm kiếm vật thể, đang điều chỉnh hướng...")
                 self.adjust_direction()
                 continue
+            
+            # Tránh chướng ngại vật
+            self.avoid_obstacles()  
 
-            detected_object = self.find_objects()  # Tìm kiếm vật thể
+            # Kiểm tra pin và quay về trạm sạc nếu cần
+            if self.should_return_to_charge_station():
+                print("Pin yếu, đang quay về trạm sạc...")
+                self.return_to_charge_station()
+                continue
+            
+            # Nhiệm vụ chính: tưới cây
+            if not self.is_watering and self.has_plants_to_water():
+                self.water_plants()
+                continue
+
+            # Tìm kiếm và xử lý vật thể khi không có nhiệm vụ khác
+            detected_object = self.find_objects()
             if detected_object:
                 print("Phát hiện vật thể:", detected_object)
-                self.handle_detected_object(detected_object)  # Xử lý vật thể
+                self.handle_detected_object(detected_object)
 
-            # Kiểm tra xem có cần quay về trạm sạc không
-            if self.should_return_to_charge_station():
-                print("Đang quay về trạm sạc...")
-                self.return_to_charge_station()
+            # Thêm một khoảng thời gian nghỉ để giảm tải CPU
+            sleep(0.05)  # Giúp vòng lặp không chiếm quá nhiều tài nguyên
+
                 
-
     def avoid_obstacles(self):
         """Tránh chướng ngại vật bằng cách sử dụng cảm biến siêu âm."""
         # Đọc khoảng cách từ cảm biến

@@ -93,22 +93,37 @@ class Modes:
 
     def automatic_mode(self):
         """Chế độ tự động cho robot thực hiện nhiệm vụ."""
-        while not self.manual_mode:
-            print("Automatic mode running...")
+        print("Chế độ tự động đang chạy...")
+
+        while self.mode == 'automatic':
+            # Kiểm tra liên tục đường line màu đen
+            if self.sensors.detect_line_black():
+                print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
+                self.adjust_direction()  # Điều chỉnh hướng để không đi qua đường line màu đen
+                continue  # Quay lại đầu vòng lặp
+
+            # Nếu không phát hiện đường line màu đen, tiếp tục các nhiệm vụ khác
             if not self.is_watering:
                 self.water_plants()  # Tưới cây nếu chưa tưới
-            self.avoid_obstacles()  # Tránh chướng ngại vật
-            self.find_objects()  # Tìm kiếm vật thể
-            self.return_to_charge_station()  # Quay về trạm sạc
 
-    def water_plants(self):
-        """Thực hiện tưới cây."""
-        print("Starting watering plants...")
-        self.relay_control.toggle_relay(True)  # Bật relay để tưới
-        sleep(10)  # Tưới trong 10 giây
-        self.relay_control.toggle_relay(False)  # Tắt relay
-        self.is_watering = False  # Đặt lại trạng thái tưới cây
-        print("Finished watering plants.")
+            self.avoid_obstacles()  # Tránh chướng ngại vật
+
+            # Kiểm tra đường line màu đen trước khi tìm kiếm vật thể
+            if self.sensors.detect_line_black():
+                print("Phát hiện đường line màu đen trong khi tìm kiếm vật thể, đang điều chỉnh hướng...")
+                self.adjust_direction()
+                continue
+
+            detected_object = self.find_objects()  # Tìm kiếm vật thể
+            if detected_object:
+                print("Phát hiện vật thể:", detected_object)
+                self.handle_detected_object(detected_object)  # Xử lý vật thể
+
+            # Kiểm tra xem có cần quay về trạm sạc không
+            if self.should_return_to_charge_station():
+                print("Đang quay về trạm sạc...")
+                self.return_to_charge_station()
+                
 
     def avoid_obstacles(self):
         """Tránh chướng ngại vật bằng cách sử dụng cảm biến siêu âm."""
@@ -207,15 +222,18 @@ class Modes:
         self.stop_robot()  # Dừng robot sau khi quay
         print(f"Robot đã quay sang {'phải' if direction == 'rotate_right' else 'trái'}.")
 
+
     def find_objects(self):
         """Tìm kiếm vật thể và tương tác với nó."""
         object_found = object_detection_loop()  # Gọi hàm để tìm kiếm vật thể
         if object_found:
-            print("Object detected!")
+            print("Phát hiện vật thể!")
             # Logic tương tác với vật thể
             self.relay_control.toggle_relay(True)  # Bật relay khi phát hiện vật thể
             sleep(2)  # Giữ relay bật trong 2 giây
             self.relay_control.toggle_relay(False)  # Tắt relay
+            # Có thể thêm logic khác để xử lý vật thể
+
 
     def return_to_charge_station(self):
         """Quay về trạm sạc."""
@@ -224,5 +242,38 @@ class Modes:
             line_found = color_detection_loop("red")  # Tìm đường line màu đỏ
             if line_found:
                 # Logic quay về trạm sạc
-                print("Charge station found! Returning...")
-                # Thêm logic quay về trạm sạc ở đây
+                print("Đã phát hiện trạm sạc, quay về...")
+                # Giả sử robot quay về theo đường line
+                while not self.charge_station_found:
+                    # Logic di chuyển về trạm sạc
+                    self.move_forward(self.SAFE_DISTANCE)  # Di chuyển về phía trước
+                    # Kiểm tra xem có đến trạm sạc không
+                    if self.detect_charge_station():  # Hàm này cần được định nghĩa
+                        self.charge_station_found = True
+                        print("Đã đến trạm sạc.")
+                        break
+    def detect_charge_station(self):
+        """Kiểm tra xem robot có đến trạm sạc hay không."""
+        # Logic để phát hiện trạm sạc, ví dụ sử dụng cảm biến hoặc camera
+        # Trả về True nếu phát hiện, False nếu không
+        return False  # Placeholder, cần thay thế bằng logic thực tế
+    
+    
+    def adjust_direction(self):
+        """Điều chỉnh hướng của robot khi phát hiện đường line màu đen."""
+        print("Điều chỉnh hướng để tránh đường line màu đen.")
+        # Logic để quay robot sang trái hoặc phải
+        self.rotate_robot('rotate_right')  # Ví dụ: quay phải
+
+    def water_plants(self):
+            """Thực hiện tưới cây."""
+            if self.is_watering:
+                print("Robot đang tưới cây, không thể tưới thêm.")
+                return
+            print("Bắt đầu tưới cây...")
+            self.is_watering = True  # Đặt trạng thái tưới cây
+            self.relay_control.toggle_relay(True)  # Bật relay để tưới
+            sleep(10)  # Tưới trong 10 giây
+            self.relay_control.toggle_relay(False)  # Tắt relay
+            self.is_watering = False  # Đặt lại trạng thái tưới cây
+            print("Hoàn thành việc tưới cây.")

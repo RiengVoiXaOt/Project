@@ -1,5 +1,6 @@
 import sys, tty, termios
 from src.hardware.motors  import Motors
+from src.hardware.kinematic import Kinematic
 
 direction = {
     'w': "go_forward",
@@ -15,6 +16,7 @@ direction = {
     '3': "rotate_right"
 }
 
+robot = Kinematic(0,0,0,0)
 def getch():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
@@ -25,7 +27,7 @@ def getch():
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return command
 
-def set_motors_direction(robot, command, vx, vy, theta):
+def set_motors_direction(command, vx, vy, theta):
     if command == 'go_forward':
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, 0, 0
     elif command == 'go_backward':
@@ -49,11 +51,8 @@ def set_motors_direction(robot, command, vx, vy, theta):
     elif command == 'rotate_right':
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, 0, 1
     
-    control(robot)
-
-def control(robot):
     motor_controller = Motors()  # Khởi tạo đối tượng Motors
-
+    robot.balancing_velocity()
     robot.backward_kinematics()  # Cập nhật giá trị động cơ dựa trên kinematics
 
     # Cập nhật tốc độ cho từng động cơ thông qua đối tượng motor_controller

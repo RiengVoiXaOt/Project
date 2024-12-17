@@ -171,7 +171,8 @@ class Modes:
         r_state = right_distance < self.SAFE_DISTANCE
 
         if not f_state:
-            self.move_forward()
+            if not r_state and not l_state:
+                self.move_forward()
             if r_state and right_distance < 15:
                 set_motors_direction('go_left', self.vx, self.vy, 0)
                 self.update_state("going left")

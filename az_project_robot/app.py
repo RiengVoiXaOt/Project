@@ -4,7 +4,7 @@ import numpy as np
 from time import sleep, time
 from src.robot.modes import Modes
 from src.hardware.motors import Motors  # Importing Motors to control the motors
-
+from src.hardware.battery import BatteryMonitor
 app = Flask(__name__)
 
 # Camera
@@ -45,10 +45,11 @@ def manual_control_route():
 
 @app.route('/status')
 def get_status():
+    battery_level = BatteryMonitor().read_battery_status()
     # Example status data, this would typically be dynamic, based on the robot's current state
     # You can use actual robot status variables from your robot's sensors
     robot_status = {
-        'battery': 85,          # Example battery percentage
+        'battery': battery_level,          # Example battery percentage
         'waterLevel': 50,       # Example water level
         'robotStatus': 'Idle',  # Example robot status
         'wheelSpeed': 0.5       # Example wheel speed

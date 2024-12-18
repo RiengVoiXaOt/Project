@@ -1,10 +1,17 @@
 class ServoControl:
     def __init__(self, servo_object):
+        if not hasattr(servo_object, 'angle'):
+            raise ValueError("Provided object is not a valid servo.")
+        
         self.servo_object = servo_object  # Đối tượng servo từ gpio_config
         self.angle = 0  # Khởi tạo góc cho servo
 
         # Cập nhật góc ban đầu cho servo
         self.servo_object.angle = self.angle
+
+    @property
+    def current_angle(self):
+        return self.angle
 
     def move_up(self, step=10):
         """
@@ -14,21 +21,21 @@ class ServoControl:
         if new_angle != self.angle:
             self.angle = new_angle
             self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
-            print(f"Moved {self.servo_object} servo up to {self.angle} degrees.")
+            print(f"Moved servo up to {self.angle} degrees.")
         else:
-            print(f"{self.servo_object} servo is already at the maximum angle.")
+            print("Servo is already at the maximum angle.")
 
     def move_down(self, step=10):
         """
         Di chuyển servo xuống (giảm góc thêm 10 độ).
         """
-        new_angle = max(self.angle - step, -90)  # Giới hạn tối thiểu là -90 độ
+        new_angle = max(self.angle - step, 0)  # Giới hạn tối thiểu là 0 độ
         if new_angle != self.angle:
             self.angle = new_angle
             self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
-            print(f"Moved {self.servo_object} servo down to {self.angle} degrees.")
+            print(f"Moved servo down to {self.angle} degrees.")
         else:
-            print(f"{self.servo_object} servo is already at the minimum angle.")
+            print("Servo is already at the minimum angle.")
 
     def reset(self):
         """
@@ -36,4 +43,15 @@ class ServoControl:
         """
         self.angle = 0
         self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
-        print(f"Reset {self.servo_object} servo to default position (0 degrees).")
+        print("Reset servo to default position (0 degrees).")
+
+    def move_to_angle(self, target_angle):
+        """
+        Di chuyển servo đến một góc cụ thể.
+        """
+        if 0 <= target_angle <= 180:
+            self.angle = target_angle
+            self.servo_object.angle = self.angle
+            print(f"Moved servo to {self.angle} degrees.")
+        else:
+            print("Angle must be between 0 and 180 degrees.")

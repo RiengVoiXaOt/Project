@@ -1,17 +1,19 @@
-from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor, AngularServo # type: ignore
+from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor# type: ignore
+from adafruit_servokit import ServoKit
 
+pca = ServoKit(channels=16)
 # === Motor Configuration ===
 # Cấu hình các động cơ với các chân GPIO tương ứng
 MOTORS = {
     "motor_1": {
         "forward": DigitalOutputDevice(5),   # Chân GPIO cho động cơ 1 quay tới
         "backward": DigitalOutputDevice(6),  # Chân GPIO cho động cơ 1 quay lùi
-        "enable": PWMOutputDevice(0)          # Chân GPIO để điều khiển tốc độ động cơ 1
+        "enable": PWMOutputDevice(18)          # Chân GPIO để điều khiển tốc độ động cơ 1
     },
     "motor_2": {
         "forward": DigitalOutputDevice(7),   # Chân GPIO cho động cơ 2 quay tới
         "backward": DigitalOutputDevice(8),  # Chân GPIO cho động cơ 2 quay lùi
-        "enable": PWMOutputDevice(1)          # Chân GPIO để điều khiển tốc độ động cơ 2
+        "enable": PWMOutputDevice(19)          # Chân GPIO để điều khiển tốc độ động cơ 2
     },
     "motor_3": {
         "forward": DigitalOutputDevice(16),  # Chân GPIO cho động cơ 3 quay tới
@@ -19,7 +21,7 @@ MOTORS = {
         "enable": PWMOutputDevice(12)         # Chân GPIO để điều khiển tốc độ động cơ 3
     },
     "motor_4": {
-        "forward": DigitalOutputDevice(19),  # Chân GPIO cho động cơ 4 quay tới
+        "forward": DigitalOutputDevice(10),  # Chân GPIO cho động cơ 4 quay tới
         "backward": DigitalOutputDevice(26), # Chân GPIO cho động cơ 4 quay lùi
         "enable": PWMOutputDevice(13)         # Chân GPIO để điều khiển tốc độ động cơ 4
     }
@@ -27,8 +29,8 @@ MOTORS = {
 
 # === Servo Configuration ===
 # Cấu hình các servo với chân GPIO tương ứng
-servo_1 = AngularServo(15, min_angle=-90, max_angle=90, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000)
-servo_2 = AngularServo(14, min_angle=-90, max_angle=90, min_pulse_width=0.5/1000, max_pulse_width=2.4/1000)   # Servo duoi
+servo_1 = pca.servo[0]
+servo_2 = pca.servo[11]   # Servo duoi
 
 # === Ultrasonic Sensor Configuration ===
 # Cấu hình các cảm biến siêu âm với chân GPIO cho echo và trigger
@@ -39,7 +41,7 @@ R_SENSOR = DistanceSensor(echo=24, trigger=23)   # Cảm biến bên phải
 
 # === Relay Configuration ===
 # Cấu hình relay với chân GPIO tương ứng
-RELAY = DigitalOutputDevice(18)  # Relay để kiểm soát các thiết bị khác
+RELAY = DigitalOutputDevice(4)  # Relay để kiểm soát các thiết bị khác
 
 # === Water Level Sensor Configuration ===
 # Cấu hình cảm biến mức nước với chân GPIO tương ứng

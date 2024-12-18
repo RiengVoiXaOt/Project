@@ -50,6 +50,8 @@ def set_motors_direction(command, vx, vy, theta):
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, 0, 0, 1
     elif command == 'rotate_right':
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, 0, 1
+    elif command =='stop':
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, 0, 0, 0
     
     motor_controller = Motors()  # Khởi tạo đối tượng Motors
     robot.balancing_velocity()

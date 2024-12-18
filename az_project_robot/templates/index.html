@@ -155,7 +155,7 @@
             <div class="status-panel">
                 <span>Mode:</span> <div id="current-mode" style="margin-left: 125px;">Manual</div>
                 <label class="switch">
-                    <input type="checkbox" id="mode-switch" onchange="toggleMode()" >
+                    <input type="checkbox" id="mode-switch" onchange="toggleMode()">
                     <span class="slider"></span>
                 </label>
             </div>
@@ -168,10 +168,6 @@
                 <div class="status-panel">
                     <span>Operation Time:</span>
                     <input type="time" id="operation-time">
-                </div>
-                <div class="status-panel">
-                    <span>Current Status:</span>
-                    <span id="robot-status">Idle</span>
                 </div>
             </div>
             <!-- Manual Control Panel -->
@@ -197,10 +193,28 @@
         <div class="status-panel">
             <div class="mode-header">
                 <h2>Status</h2>
-            </div>  
+            </div>
             <div class="status-panel">
-                <span>Battery:</span>
-                <span id="battery-status">Loading...</span>
+                <div>
+                    <span>Battery_Percentage:</span>
+                    <span id="battery-status">Loading...</span>
+                </div>
+                <div>
+                    <span>Voltage:</span>
+                    <span id="voltage-status">Loading...</span>
+                </div>
+                <div>
+                    <span>Current:</span>
+                    <span id="current-status">Loading...</span>
+                </div>
+                <div>
+                    <span>Power:</span>
+                    <span id="power-status">Loading...</span>
+                </div>
+                <div>
+                    <span>Remaining_Time:</span>
+                    <span id="remain-time-status">Loading...</span>
+                </div>
             </div>
             <div class="status-panel">
                 <span>Water Level:</span>
@@ -214,12 +228,28 @@
                 <span>Wheel Speed:</span>
                 <span id="wheel-speed">Loading...</span>
             </div>
+            <div class="status-panel">
+                <span>Front Sensor:</span>
+                <span id="front-sensor">Loading...</span>
+            </div>
+            <div class="status-panel">
+                <span>Left Sensor:</span>
+                <span id="left-sensor">Loading...</span>
+            </div>
+            <div class="status-panel">
+                <span>Right Sensor:</span>
+                <span id="right-sensor">Loading...</span>
+            </div>
+            <div class="status-panel">
+                <span>Direction:</span>
+                <span id="robot-direction">Loading...</span>
+            </div>
         </div>
     </div>
 
     <script>
         function sendCommand(command) {
-            fetch(`/control`, {
+            fetch('/manual_control', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -227,39 +257,42 @@
                 body: JSON.stringify({ command: command })
             }).catch(err => console.error('Failed to send command', err));
         }
-        
         function updateStatus() {
             fetch('/status')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('battery-status').innerText = data.battery + '%';
-                    document.getElementById('water-level-status').innerText = data.waterLevel;
-                    document.getElementById('robot-status').innerText = data.robotStatus;
-                    document.getElementById('wheel-speed').innerText = data.wheelSpeed;
-                })
-                .catch(err => console.error('Failed to fetch status', err));
-        }       
-
+                    document.getElementById('battery-status').innerText = data.percentage.toFixed(1) + '%';
+                    document.getElementById('voltage-status').innerText = data.voltage.toFixed(1) + 'V';
+                    document.getElementById('current-status').innerText = data.current.toFixed(1) + 'mA';
+                    document.getElementById('power-status').innerText = data.power.toFixed(1) + 'mW';
+                    document.getElementById('remain-time-status').innerText = data.remaining_time.toFixed(1) +' hours';
+                    document.getElementById('water-level-status').innerText = data.water_level;
+                    document.getElementById('wheel-speed').innerText = data.wheel_speed;
+                    document.getElementById('front-sensor').innerText = data.front_sensor;
+                    document.getElementById('left-sensor').innerText = data.left_sensor;
+                    document.getElementById('right-sensor').innerText = data.right_sensor;
+                    document.getElementById('robot-direction').innerText = data.direction; 
+                }).catch(err => console.error('Failed to fetch status', err)); }
         function updateCurrentTime() {
             const now = new Date();
             const timeString = now.toLocaleTimeString();
             document.getElementById('current-time').innerText = timeString;
         }
-
+    
         function toggleMode() {
             const isAuto = document.getElementById('mode-switch').checked;
             document.getElementById('auto-mode').style.display = isAuto ? 'block' : 'none';
             document.getElementById('manual-control').style.display = isAuto ? 'none' : 'grid';
             document.getElementById('current-mode').innerText = isAuto ? 'Auto' : 'Manual';
         }
+    
         // Update status every 5 seconds
         setInterval(updateStatus, 5000);
         setInterval(updateCurrentTime, 1000);
         updateStatus();
         updateCurrentTime();
-
+    
         // Initialize mode
         toggleMode();
     </script>
-</body>
-</html>
+                

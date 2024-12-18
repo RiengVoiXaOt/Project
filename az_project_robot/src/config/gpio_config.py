@@ -27,8 +27,8 @@ MOTORS = {
 
 # === Servo Configuration ===
 # Cấu hình các servo với chân GPIO tương ứng
-servo_1 = AngularServo(15, min_angle=0, max_angle=180, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000)
-servo_2 = AngularServo(14, min_angle=0, max_angle=180, min_pulse_width=0.5/1000, max_pulse_width=2.4/1000)   # Servo duoi
+servo_1 = AngularServo(15, min_angle=-90, max_angle=90, min_pulse_width=0.5/1000, max_pulse_width=2.5/1000)
+servo_2 = AngularServo(14, min_angle=-90, max_angle=90, min_pulse_width=0.5/1000, max_pulse_width=2.4/1000)   # Servo duoi
 
 # === Ultrasonic Sensor Configuration ===
 # Cấu hình các cảm biến siêu âm với chân GPIO cho echo và trigger

@@ -1,7 +1,7 @@
 class ServoControl:
     def __init__(self, servo_object):
         self.servo_object = servo_object  # Đối tượng servo từ gpio_config
-        self.angle = 90  # Khởi tạo góc cho servo
+        self.angle = 0  # Khởi tạo góc cho servo
 
         # Cập nhật góc ban đầu cho servo
         self.servo_object.angle = self.angle
@@ -10,7 +10,7 @@ class ServoControl:
         """
         Di chuyển servo lên (tăng góc thêm 10 độ).
         """
-        new_angle = min(self.angle + step, 180)  # Giới hạn tối đa là 180 độ
+        new_angle = min(self.angle + step, 90)  # Giới hạn tối đa là 90 độ
         if new_angle != self.angle:
             self.angle = new_angle
             self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
@@ -22,7 +22,7 @@ class ServoControl:
         """
         Di chuyển servo xuống (giảm góc thêm 10 độ).
         """
-        new_angle = max(self.angle - step, 0)  # Giới hạn tối thiểu là 0 độ
+        new_angle = max(self.angle - step, -90)  # Giới hạn tối thiểu là -90 độ
         if new_angle != self.angle:
             self.angle = new_angle
             self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
@@ -32,8 +32,8 @@ class ServoControl:
 
     def reset(self):
         """
-        Đặt lại servo về vị trí mặc định (90 độ).
+        Đặt lại servo về vị trí mặc định (0 độ).
         """
-        self.angle = 90
+        self.angle = 0
         self.servo_object.angle = self.angle  # Cập nhật góc của đối tượng servo
-        print(f"Reset {self.servo_object} servo to default position (90 degrees).")
+        print(f"Reset {self.servo_object} servo to default position (0 degrees).")

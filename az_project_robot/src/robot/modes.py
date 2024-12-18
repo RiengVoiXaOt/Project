@@ -71,33 +71,44 @@ class Modes:
             if command == 'p':
                 self.top_servo.reset()  # Đặt lại servo
                 self.bottom_servo.reset()  # Đặt lại servo
+                self.update_state("manual control exited")
+                set_motors_direction('stop', 0, 0, 0)
                 print("Exiting manual control.")
                 return
             elif command in ['+', '=']:
                 self.n = min(self.n + 1, 10)  # Tăng tốc độ lên tối đa 100%
                 self.vx = self.n * self.speed
                 self.vy = self.n * self.speed
+                self.update_state(f"speed increased to {self.n * 10}%")
                 print(f"Tốc độ tăng lên {self.n * 10}%")
             elif command in ['-', '_']:
                 self.n = max(self.n - 1, 0)  # Giảm tốc độ xuống tối thiểu 0%
                 self.vx = self.n * self.speed
                 self.vy = self.n * self.speed
+                self.update_state(f"speed decreased to {self.n * 10}%")
                 print(f"Tốc độ giảm xuống {self.n * 10}%")
             elif command in direction:
                 current_direction = direction[command]  # Lấy hướng di chuyển từ lệnh
                 print("Direction: " + current_direction)
                 set_motors_direction(current_direction, self.vx, self.vy, self.theta)  # Thiết lập hướng động cơ
+                self.update_state(f"moving {current_direction}")
             elif command == 'r':
                 self.relay_control.run_relay_for_duration()  # Bật relay tưới cây
+                self.update_state("watering activated")
             elif command == '7':
                 self.bottom_servo.move_up()  # Di chuyển servo dưới lên
+                self.update_state("bottom servo moved up")
             elif command == '8':
                 self.bottom_servo.move_down()  # Di chuyển servo dưới xuống
+                self.update_state("bottom servo moved down")
             elif command == '9':
                 self.top_servo.move_up()  # Di chuyển servo trên lên
+                self.update_state("top servo moved up")
             elif command == '0':
                 self.top_servo.move_down()  # Di chuyển servo trên xuống
+                self.update_state("top servo moved down")
             else:
+                self.update_state("invalid command")
                 print("Lệnh không hợp lệ. Vui lòng thử lại.")
                 
     def automatic_mode(self):
@@ -222,16 +233,80 @@ class Modes:
         self.update_state(f"rotating {'right' if direction == 'rotate_right' else 'left'}")
 
 
-    def find_objects(self):
-        """Tìm kiếm vật thể và tương tác với nó."""
-        object_found = object_detection_loop()  # Gọi hàm để tìm kiếm vật thể
-        if object_found:
-            print("Phát hiện vật thể!")
-            # Logic tương tác với vật thể
-            self.relay_control.toggle_relay(True)  # Bật relay khi phát hiện vật thể
-            sleep(2)  # Giữ relay bật trong 2 giây
-            self.relay_control.toggle_relay(False)  # Tắt relay
-            # Có thể thêm logic khác để xử lý vật thể
+    def find_object(self):
+        """
+        Tìm kiếm vật thể bằng cách quét qua servo, di chuyển đến vật thể nếu phát hiện, 
+        và bật relay nếu khoảng cách đủ gần.
+        """
+        print("Bắt đầu tìm kiếm vật thể...")
+
+        # Quét bằng servo trên và dưới
+        for top_angle in range(-90, 90, 20):  # Servo trên quét từ 0° đến 180°
+            self.top_servo.move_to_angle(top_angle)
+            for bottom_angle in range(-90, 90, 20):  # Servo dưới quét từ 0° đến 180°
+                self.bottom_servo.move_to_angle(bottom_angle)
+
+                # Phát hiện đối tượng
+                detected_objects = object_detection_loop()
+                if not detected_objects:
+                    continue
+
+                for obj in detected_objects:
+                    label = obj.get("label")
+                    distance = self.ultrasonic_sensors.get_distance("front")
+
+                    if label == "water":
+                        print(f"Phát hiện vật thể '{label}' ở góc ({top_angle}, {bottom_angle})")
+                        
+                        # Xác định tâm của vật
+                        while True:
+                            # Cập nhật lại vị trí của vật thể
+                            detected_objects = object_detection_loop()
+                            if detected_objects:
+                                obj = detected_objects[0]  # Lấy đối tượng đầu tiên
+                                label = obj.get("label")
+                                if label == "water":
+                                    # Di chuyển servo trên để theo dõi vật
+                                    self.top_servo.move_to_angle(top_angle)
+                                    # Cập nhật khoảng cách
+                                    distance = self.ultrasonic_sensors.get_distance("front")
+
+                                    # Xoay robot để servo dưới ở vị trí mặc định
+                                    self.rotate_robot('rotate_left')  # Hoặc 'rotate_right' tùy vào vị trí
+                                    sleep(0.1)  # Một khoảng thời gian ngắn để robot xoay
+
+                                    # Kiểm tra xem robot đã thẳng hàng với vật chưa
+                                    if self.is_aligned_with_object(obj):
+                                        break  # Thoát vòng lặp nếu đã thẳng hàng
+
+                        # Di chuyển thẳng đến vật thể
+                        while distance > 10:  # Di chuyển đến khi khoảng cách <= 10 cm
+                            print(f"Khoảng cách đến vật thể: {distance} cm")
+                            self.move_forward()
+                            distance = self.ultrasonic_sensors.get_distance("front")
+
+                        # Dừng lại và bật relay
+                        self.stop_robot()
+                        print("Đã đến gần vật thể. Bật relay...")
+                        self.relay_control.toggle_relay(True)
+                        sleep(2)  # Bật relay trong 2 giây
+                        self.relay_control.toggle_relay(False)
+                        return  # Thoát hàm sau khi hoàn tất
+
+        print("Không tìm thấy vật thể.")
+
+    def is_aligned_with_object(self, obj):
+        """
+        Kiểm tra xem robot đã thẳng hàng với vật thể chưa.
+        """
+        # Lấy vị trí của vật thể (giả sử có thuộc tính x, y trong obj)
+        object_x = obj.get("x")  # Tọa độ x của vật thể
+        object_y = obj.get("y")  # Tọa độ y của vật thể
+
+        # Tính toán xem robot có thẳng hàng với vật thể không
+        # Đây là một ví dụ đơn giản, bạn có thể thay đổi logic tùy theo cách tính toán của bạn
+        # Ví dụ: kiểm tra nếu object_x gần với 0 (trung tâm)
+        return abs(object_x) < 5  # Giả sử robot nằm ở x=0, điều chỉnh khoảng cách này nếu cần
 
 
     def return_to_charge_station(self):

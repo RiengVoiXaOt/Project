@@ -57,7 +57,7 @@ def get_status():
         "percentage": battery_percentage,
         "remaining_time": remaining_time_hours,
 
-        "water": "Có nước" if water_present else "Khát quá"
+        "water": "Có nước" if water_present else "Khát quá",
         "front_sensor": front_distance,
         "left_sensor":  left_distance,
         "right_sensor":  right_distance,

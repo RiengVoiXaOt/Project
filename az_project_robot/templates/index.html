@@ -266,11 +266,11 @@
                     document.getElementById('current-status').innerText = data.current.toFixed(1) + 'mA';
                     document.getElementById('power-status').innerText = data.power.toFixed(1) + 'mW';
                     document.getElementById('remain-time-status').innerText = data.remaining_time.toFixed(1) +' hours';
-                    document.getElementById('water-level-status').innerText = data.water_level;
+                    document.getElementById('water-level-status').innerText = data.water;
                     document.getElementById('wheel-speed').innerText = data.wheel_speed;
-                    document.getElementById('front-sensor').innerText = data.front_sensor;
-                    document.getElementById('left-sensor').innerText = data.left_sensor;
-                    document.getElementById('right-sensor').innerText = data.right_sensor;
+                    document.getElementById('front-sensor').innerText = data.front_sensor.toFixed(1) +'cm';
+                    document.getElementById('left-sensor').innerText = data.left_sensor.toFixed(1) +'cm';
+                    document.getElementById('right-sensor').innerText = data.right_sensor.toFixed(1) +'cm';
                     document.getElementById('robot-direction').innerText = data.direction; 
                 }).catch(err => console.error('Failed to fetch status', err)); }
         function updateCurrentTime() {

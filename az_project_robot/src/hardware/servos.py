@@ -30,9 +30,12 @@ def angle_to_pwm(angle, pulse_min=150, pulse_max=600):
     return int(pulse_length)
 # === ServoControl Class ===
 class ServoControl:
+    DEFAULT_ANGLE = 60  # Góc mặc định
+    MIN_ANGLE = 10  # Giới hạn góc nhỏ nhất
+    MAX_ANGLE = 120
     def __init__(self, channel):
         self.channel = channel  # Kênh của servo trên PCA9685
-        self.angle = 60  # Góc ban đầu (90 độ)
+        self.angle = self.DEFAULT_ANGLE  # Góc ban đầu (60 độ)
         self.move_to_angle(self.angle)  # Đặt góc ban đầu
 
     @property
@@ -43,7 +46,7 @@ class ServoControl:
         """
         Di chuyển servo lên (tăng góc thêm `step` độ).
         """
-        new_angle = min(self.angle + step, 120)  # Giới hạn tối đa là 120 độ
+        new_angle = min(self.angle + step, self.MAX_ANGLE)  # Giới hạn tối đa là 120 độ
         if new_angle != self.angle:
             self.move_to_angle(new_angle)
             print(f"Moved servo up to {self.angle} degrees.")
@@ -54,7 +57,7 @@ class ServoControl:
         """
         Di chuyển servo xuống (giảm góc thêm `step` độ).
         """
-        new_angle = max(self.angle - step, 10)  # Giới hạn tối thiểu là 10 độ
+        new_angle = max(self.angle - step, self.MIN_ANGLE)  # Giới hạn tối thiểu là 10 độ
         if new_angle != self.angle:
             self.move_to_angle(new_angle)
             print(f"Moved servo down to {self.angle} degrees.")
@@ -63,21 +66,30 @@ class ServoControl:
 
     def reset(self):
         """
-        Đặt lại servo về vị trí mặc định (0 độ).
+        Đặt lại servo về vị trí mặc định (60 độ).
         """
-        self.move_to_angle(60)  # Đặt lại góc về 0 độ
+        self.move_to_angle(self.DEFAULT_ANGLE)  # Đặt lại góc về 60 độ
 
     def move_to_angle(self, target_angle):
         """
         Di chuyển servo đến một góc cụ thể.
         """
-        if 10 <= target_angle <= 120:
+        if self.MIN_ANGLE <= target_angle <= self.MAX_ANGLE:
             self.angle = target_angle
             pwm_val = angle_to_pwm(self.angle)
             set_pwm(bus, pca9685_address, self.channel, 0, pwm_val)  # Gửi tín hiệu PWM tới kênh
             print(f"Moved servo to {self.angle} degrees.")
         else:
             print("Angle must be between 10 and 120 degrees.")
+    def servo_move_to_search(self):
+        """
+        Di chuyển servo từ góc nhỏ nhất đến lớn nhất để tìm vật.
+        """
+        for angle in range(self.MIN_ANGLE, self.MAX_ANGLE + 1, 10):
+            self.move_to_angle(angle)  # Di chuyển tới góc hiện tại
+            time.sleep(0.5)  # Dừng lại một giây tại mỗi góc để "kiểm tra"
+            print(f"Searching at {angle} degrees.")
+        
 
 # Khởi động PCA9685
 bus.write_byte_data(pca9685_address, 0x00, 0x01)  # Reset PCA9685

@@ -63,4 +63,4 @@ def object_detection_loop(videostream, stop_event, frame_queue):
 
         # Gửi kết quả qua hàng đợi
         if not frame_queue.full():
-            frame_queue.put((None, None, None, frame))  # Đẩy frame vào hàng đợi
+            frame_queue.put(( None, frame))  # Đẩy frame vào hàng đợi

@@ -85,7 +85,11 @@ def display_info(frame, fps, statuses, deviations, center_x, center_y):
 
     for i, (status, deviation) in enumerate(zip(statuses, deviations)):
         color = (0, 0, 255) if i == 0 else (255, 255, 255)
-        cv2.putText(frame, status, (10, 40 + i * 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+        
+        # Đảm bảo status là chuỗi
+        status_str = str(status)
+        
+        cv2.putText(frame, status_str, (10, 40 + i * 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
         cv2.putText(frame, f"x: {deviation[0]}, y: {deviation[1]}", (10, 80 + i * 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
     cv2.line(frame, (center_x, 0), (center_x, frame.shape[0]), (0, 255, 0), 1)

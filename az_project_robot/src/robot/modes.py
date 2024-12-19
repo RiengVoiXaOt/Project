@@ -138,6 +138,19 @@ class Modes:
     def stop_robot(self):
         set_motors_direction("stop", 0, 0, 0)  # Dừng tất cả động cơ
         self.update_state("stopped")
+    def rotate_robot(self, direction, angle=90):
+        max_rotate_time = angle / 90 * 3
+        rotate_start_time = time()
+
+        while time() - rotate_start_time < max_rotate_time:
+            front_distance = self.ultrasonic_sensors.get_distance("front")
+            if front_distance >= 1.5 * self.SAFE_DISTANCE:
+                self.stop_robot()
+                break
+            set_motors_direction(direction, self.vx, self.vy, 0)
+            sleep(0.1)
+        self.stop_robot()
+        self.update_state(f"rotating {'right' if direction == 'rotate_right' else 'left'}")
 
     def avoid_obstacles(self):
         """Tránh chướng ngại vật bằng cách sử dụng cảm biến siêu âm."""
@@ -193,19 +206,6 @@ class Modes:
         elif not l_state and not r_state:
             self.rotate_robot('rotate_right')
 
-    def rotate_robot(self, direction, angle=90):
-        max_rotate_time = angle / 90 * 3
-        rotate_start_time = time()
-
-        while time() - rotate_start_time < max_rotate_time:
-            front_distance = self.ultrasonic_sensors.get_distance("front")
-            if front_distance >= 1.5 * self.SAFE_DISTANCE:
-                self.stop_robot()
-                break
-            set_motors_direction(direction, self.vx, self.vy, 0)
-            sleep(0.1)
-        self.stop_robot()
-        self.update_state(f"rotating {'right' if direction == 'rotate_right' else 'left'}")
     ###############################Không cần chỉnh sửa các hàm này####################
     
     
@@ -218,30 +218,30 @@ class Modes:
             if time() - self.last_activity_time > 300:  # 5 phút không hoạt động
                 print("Không có hoạt động trong 5 phút, tự động chuyển sang chế độ tự động.")
                 self.activate_automatic_mode()
-                self.last_activity_time = time7777()  # Reset thời gian hoạt động cuối cùng
+                self.last_activity_time = time()  # Reset thời gian hoạt động cuối cùng
 
             # Kiểm tra đường line màu đen và điều chỉnh hướng nếu cần
             if self.sensors.detect_line_black():
                 print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
                 self.adjust_direction()
-                self.last_activity_time = time7777()
+                self.last_activity_time = time()
                 continue
             
             # Tránh chướng ngại vật
             self.avoid_obstacles()  
-            self.last_activity_time = time7777()
+            self.last_activity_time = time()
 
             # Kiểm tra pin và quay về trạm sạc nếu cần
             if self.should_return_to_charge_station():
                 print("Pin yếu, đang quay về trạm sạc...")
                 self.return_to_charge_station()
-                self.last_activity_time = time7777()
+                self.last_activity_time = time()
                 continue
             
             # Nhiệm vụ chính: tưới cây
             if not self.is_watering and self.has_plants_to_water():
                 self.water_plants()
-                self.last_activity_time = time7777()
+                self.last_activity_time = time()
                 continue
 
             # Tìm kiếm và xử lý vật thể khi không có nhiệm vụ khác
@@ -249,7 +249,7 @@ class Modes:
             if detected_object:
                 print("Phát hiện vật thể:", detected_object)
                 self.handle_detected_object(detected_object)
-                self.last_activity_time = time7777()
+                self.last_activity_time = time()
 
             # Thêm một khoảng thời gian nghỉ để giảm tải CPU
             sleep(0.05)  # Giúp vòng lặp không chiếm quá nhiều tài nguyên

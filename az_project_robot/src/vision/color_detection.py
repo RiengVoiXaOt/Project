@@ -56,7 +56,7 @@ def color_detection_loop(videostream, center_x, center_y, min_box_area, stop_eve
 
         # Gửi kết quả qua hàng đợi để truyền cho phần hiển thị
         if not frame_queue.full():
-            frame_queue.put((frame, mask_red, mask_black, None))
+            frame_queue.put((frame, None))
 
         # Hiển thị thông tin FPS và các kết quả trên video
         display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [status_red, status_black], [(x_r, y_r), (x_b, y_b)], center_x, center_y)

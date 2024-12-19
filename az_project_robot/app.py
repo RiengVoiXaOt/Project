@@ -51,11 +51,11 @@ def get_status():
 
     # Tạo dictionary status với các thông tin khác
     status = {
-        # "voltage": voltage,
-        # "current": current,
-        # "power": power,
-        # "percentage": battery_percentage,
-        # "remaining_time": remaining_time_hours,
+        "voltage": voltage,
+        "current": current,
+        "power": power,
+        "percentage": battery_percentage,
+        "remaining_time": remaining_time_hours,
 
         "water": "Có nước" if water_present else "Khát quá",
         "front_sensor": front_distance,

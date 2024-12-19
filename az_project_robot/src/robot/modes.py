@@ -1,7 +1,7 @@
 from time import sleep, time
 from src.hardware.relay import RelayControl
 from src.hardware.servos import ServoControl
-from src.config.gpio_config import servo_1, servo_2
+from src.config.gpio_config import kit
 from src.hardware.motors import Motors
 from src.hardware.ultrasonic import UltrasonicSensors
 from src.vision.color_detection import color_detection_loop
@@ -36,8 +36,8 @@ class Modes:
     def __init__(self, n=None, theta=None):
         # Khởi tạo các thành phần phần cứng của robot
         self.relay_control = RelayControl(5)  # Điều khiển relay cho tưới cây
-        self.top_servo = ServoControl(servo_2)  # Sử dụng servo_2 cho servo trên
-        self.bottom_servo = ServoControl(servo_1)  # Sử dụng servo_1 cho servo dưới
+        self.top_servo = ServoControl(kit.servo[7])  # Sử dụng servo_2 cho servo trên
+        self.bottom_servo = ServoControl(kit.servo[8])  # Sử dụng servo_1 cho servo dưới
         self.motors = Motors()  # Điều khiển động cơ
         self.ultrasonic_sensors = UltrasonicSensors()  # Cảm biến siêu âm
         self.manual_mode = False  # Biến kiểm tra chế độ thủ công
@@ -54,7 +54,7 @@ class Modes:
         self.theta = theta  # Góc quay
         self.state = "stopped"  # Trạng thái hiện tại của robot
         self.distance_history = {'front': [], 'left': [], 'right': []}  # Lịch sử khoảng cách
-
+    
     def switch_mode(self):
         """Chuyển đổi giữa chế độ tự động và chế độ thủ công."""
         self.manual_mode = not self.manual_mode  # Đảo ngược chế độ
@@ -66,7 +66,7 @@ class Modes:
     def manual_control(self):
         """Chế độ điều khiển thủ công bằng bàn phím."""
         while self.manual_mode:
-            print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, u to move servo up, i to move servo down, p to quit): ")
+            print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, p to quit): ")
             command = getch()  # Nhận lệnh từ bàn phím
             if command == 'p':
                 self.top_servo.reset()  # Đặt lại servo
@@ -95,18 +95,19 @@ class Modes:
             elif command == 'r':
                 self.relay_control.run_relay_for_duration()  # Bật relay tưới cây
                 self.update_state("watering activated")
-            elif command == '7':
-                self.bottom_servo.move_up()  # Di chuyển servo dưới lên
-                self.update_state("bottom servo moved up")
-            elif command == '8':
-                self.bottom_servo.move_down()  # Di chuyển servo dưới xuống
-                self.update_state("bottom servo moved down")
-            elif command == '9':
-                self.top_servo.move_up()  # Di chuyển servo trên lên
-                self.update_state("top servo moved up")
-            elif command == '0':
-                self.top_servo.move_down()  # Di chuyển servo trên xuống
-                self.update_state("top servo moved down")
+            elif command in ['7', '8', '9', '0']:
+                if command == '7':
+                    self.bottom_servo.move_up()  # Di chuyển servo dưới lên
+                    self.update_state("bottom servo moved up")
+                elif command == '8':
+                    self.bottom_servo.move_down()  # Di chuyển servo dưới xuống
+                    self.update_state("bottom servo moved down")
+                elif command == '9':
+                    self.top_servo.move_up()  # Di chuyển servo trên lên
+                    self.update_state("top servo moved up")
+                elif command == '0':
+                    self.top_servo.move_down()  # Di chuyển servo trên xuống
+                    self.update_state("top servo moved down")
             else:
                 self.update_state("invalid command")
                 print("Lệnh không hợp lệ. Vui lòng thử lại.")

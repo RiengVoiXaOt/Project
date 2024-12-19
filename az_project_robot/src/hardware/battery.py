@@ -1,7 +1,8 @@
 from ina219 import INA219  # type: ignore
 from collections import deque
 
-INA219_ADDRESS = 0x40
+# Địa chỉ I2C của INA219
+INA219_ADDRESS = 0x40  # Địa chỉ mặc định của INA219
 SHUNT_OHMS = 0.1
 FULL_VOLTAGE = 16.8
 MIN_VOLTAGE = 14.8
@@ -13,7 +14,7 @@ class BatteryMonitor:
         Khởi tạo cảm biến INA219 và cấu hình các thông số cần thiết.
         """
         try:
-            self.ina = INA219(SHUNT_OHMS, address=INA219_ADDRESS, busnum=1)
+            self.ina = INA219(SHUNT_OHMS, address=INA219_ADDRESS, busnum=1)  # Bus 1 cho INA219
             self.ina.configure()
             self.current_history = deque(maxlen=20)  # Lưu trữ dòng điện để tính trung bình
         except Exception as e:

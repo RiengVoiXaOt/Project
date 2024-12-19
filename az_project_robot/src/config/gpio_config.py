@@ -29,16 +29,11 @@ MOTORS = {
     }
 }
 
-# === Servo Configuration ===
-# Cấu hình các servo với PCA9685 (thông qua ServoKit)
-i2c_bus = busio.I2C(board.SCL, board.SDA)  # Sử dụng GPIO 2 (SDA) và GPIO 3 (SCL) cho I2C
-kit = ServoKit(channels=16, i2c=i2c_bus, address=0x40)
-
 # === Ultrasonic Sensor Configuration ===
 # Cấu hình các cảm biến siêu âm với chân GPIO cho echo và trigger
 F_SENSOR = DistanceSensor(echo=9, trigger=10)    # Cảm biến phía trước
-L_SENSOR = DistanceSensor(echo=17, trigger=4)    # Cảm biến bên trái
-R_SENSOR = DistanceSensor(echo=22, trigger=27)   # Cảm biến bên phải
+L_SENSOR = DistanceSensor(echo=25, trigger=4)    # Cảm biến bên trái
+R_SENSOR = DistanceSensor(echo=22, trigger=8)   # Cảm biến bên phải
 
 # === Relay Configuration ===
 # Cấu hình relay với chân GPIO tương ứng

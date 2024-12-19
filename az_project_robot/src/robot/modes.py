@@ -1,13 +1,13 @@
 from time import sleep, time
 from src.hardware.relay import RelayControl
 from src.hardware.servos import ServoControl
-from src.config.gpio_config import kit
 from src.hardware.motors import Motors
 from src.hardware.ultrasonic import UltrasonicSensors
 from src.vision.color_detection import color_detection_loop
 from src.vision.object_detection import object_detection_loop
 from src.utils.control_utils import getch, direction, set_motors_direction
 import numpy as np
+from threading import Thread, Event
 
 """
 Robot sẽ có hai chế độ hoạt động chính:
@@ -36,8 +36,8 @@ class Modes:
     def __init__(self, n=None, theta=None):
         # Khởi tạo các thành phần phần cứng của robot
         self.relay_control = RelayControl(5)  # Điều khiển relay cho tưới cây
-        self.top_servo = ServoControl(kit.servo[7])  # Sử dụng servo_2 cho servo trên
-        self.bottom_servo = ServoControl(kit.servo[8])  # Sử dụng servo_1 cho servo dưới
+        self.top_servo = ServoControl(channel=0)  # Sử dụng servo_2 cho servo trên
+        self.bottom_servo = ServoControl(channel=1)  # Sử dụng servo_1 cho servo dưới
         self.motors = Motors()  # Điều khiển động cơ
         self.ultrasonic_sensors = UltrasonicSensors()  # Cảm biến siêu âm
         self.manual_mode = False  # Biến kiểm tra chế độ thủ công
@@ -54,7 +54,10 @@ class Modes:
         self.theta = theta  # Góc quay
         self.state = "stopped"  # Trạng thái hiện tại của robot
         self.distance_history = {'front': [], 'left': [], 'right': []}  # Lịch sử khoảng cách
-    
+        self.active_mode = "automatic"  # Biến theo dõi chế độ hoạt động hiện tại
+        self.last_activity_time = time()  # Thời gian hoạt động cuối cùng
+        self.check_event = Event()  # Để kiểm soát việc kiểm tra chế độ
+        ###############################Không cần chỉnh sửa các hàm này####################
     def switch_mode(self):
         """Chuyển đổi giữa chế độ tự động và chế độ thủ công."""
         self.manual_mode = not self.manual_mode  # Đảo ngược chế độ
@@ -62,7 +65,13 @@ class Modes:
         print(f"Switched to {mode} mode.")
         if self.manual_mode:
             self.motors.stop_all()  # Dừng tất cả động cơ khi chuyển sang chế độ thủ công
-    
+            
+    def start(self):
+        """Bắt đầu chế độ tự động."""
+        self.check_event.clear()
+        automatic_thread = Thread(target=self.automatic_mode)
+        automatic_thread.start()
+        
     def manual_control(self):
         """Chế độ điều khiển thủ công bằng bàn phím."""
         while self.manual_mode:
@@ -111,47 +120,12 @@ class Modes:
             else:
                 self.update_state("invalid command")
                 print("Lệnh không hợp lệ. Vui lòng thử lại.")
-                
-    def automatic_mode(self):
-        """Chế độ tự động cho robot thực hiện nhiệm vụ."""
-        print("Chế độ tự động đang chạy...")
 
-        while not self.manual_mode:  # Vòng lặp chạy khi ở chế độ tự động
-            # Kiểm tra đường line màu đen và điều chỉnh hướng nếu cần
-            # if self.sensors.detect_line_black():
-            #     print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
-            #     self.adjust_direction()
-            #     continue
-            
-            # Tránh chướng ngại vật
-            self.avoid_obstacles()  
-
-            # # Kiểm tra pin và quay về trạm sạc nếu cần
-            # if self.should_return_to_charge_station():
-            #     print("Pin yếu, đang quay về trạm sạc...")
-            #     self.return_to_charge_station()
-            #     continue
-            
-            # # Nhiệm vụ chính: tưới cây
-            # if not self.is_watering and self.has_plants_to_water():
-            #     self.water_plants()
-            #     continue
-
-            # # Tìm kiếm và xử lý vật thể khi không có nhiệm vụ khác
-            # detected_object = self.find_objects()
-            # if detected_object:
-            #     print("Phát hiện vật thể:", detected_object)
-            #     self.handle_detected_object(detected_object)
-
-            # # Thêm một khoảng thời gian nghỉ để giảm tải CPU
-            # sleep(0.05)  # Giúp vòng lặp không chiếm quá nhiều tài nguyên
-    
-    
     def update_state(self, new_state):
-        """Cập nhật trạng thái và in trạng thái mới nếu có thay đổi."""
-        if self.state != new_state:
-            self.state = new_state
-            print(f"Trạng thái hiện tại: {self.state}")
+            """Cập nhật trạng thái và in trạng thái mới nếu có thay đổi."""
+            if self.state != new_state:
+                self.state = new_state
+                print(f"Trạng thái hiện tại: {self.state}")
 
     def move_forward(self):
         set_motors_direction("go_forward", self.vx, self.vy, 0)  # Thiết lập hướng di chuyển
@@ -232,8 +206,74 @@ class Modes:
             sleep(0.1)
         self.stop_robot()
         self.update_state(f"rotating {'right' if direction == 'rotate_right' else 'left'}")
+    ###############################Không cần chỉnh sửa các hàm này####################
+    
+    
+    def automatic_mode(self):
+        """Chế độ tự động cho robot thực hiện nhiệm vụ."""
+        print("Chế độ tự động đang chạy...")
 
+        while not self.manual_mode:  # Vòng lặp chạy khi ở chế độ tự động
+            # Kiểm tra thời gian không hoạt động
+            if time() - self.last_activity_time > 300:  # 5 phút không hoạt động
+                print("Không có hoạt động trong 5 phút, tự động chuyển sang chế độ tự động.")
+                self.activate_automatic_mode()
+                self.last_activity_time = time7777()  # Reset thời gian hoạt động cuối cùng
 
+            # Kiểm tra đường line màu đen và điều chỉnh hướng nếu cần
+            if self.sensors.detect_line_black():
+                print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
+                self.adjust_direction()
+                self.last_activity_time = time7777()
+                continue
+            
+            # Tránh chướng ngại vật
+            self.avoid_obstacles()  
+            self.last_activity_time = time7777()
+
+            # Kiểm tra pin và quay về trạm sạc nếu cần
+            if self.should_return_to_charge_station():
+                print("Pin yếu, đang quay về trạm sạc...")
+                self.return_to_charge_station()
+                self.last_activity_time = time7777()
+                continue
+            
+            # Nhiệm vụ chính: tưới cây
+            if not self.is_watering and self.has_plants_to_water():
+                self.water_plants()
+                self.last_activity_time = time7777()
+                continue
+
+            # Tìm kiếm và xử lý vật thể khi không có nhiệm vụ khác
+            detected_object = self.find_object()
+            if detected_object:
+                print("Phát hiện vật thể:", detected_object)
+                self.handle_detected_object(detected_object)
+                self.last_activity_time = time7777()
+
+            # Thêm một khoảng thời gian nghỉ để giảm tải CPU
+            sleep(0.05)  # Giúp vòng lặp không chiếm quá nhiều tài nguyên
+
+    def exit_automatic_mode(self):
+        """Thoát chế độ tự động."""
+        print("Đang thoát chế độ tự động...")
+        self.manual_mode = True
+        self.stop_robot()  # Dừng robot khi thoát chế độ tự động
+    
+    def activate_automatic_mode(self):
+        """Kích hoạt lại chế độ tự động."""
+        print("Kích hoạt lại chế độ tự động.")
+        self.manual_mode = False
+        self.start()  # Bắt đầu lại chế độ tự động
+        
+    def user_input_listener(self):
+        """Lắng nghe đầu vào từ người dùng để thoát chế độ tự động."""
+        while True:
+            user_input = input("Nhấn 'p' để thoát khỏi chế độ tự động: ")
+            if user_input.lower() == 'p':
+                self.exit_automatic_mode()
+                break
+    
     def find_object(self):
         """
         Tìm kiếm vật thể bằng cách quét qua servo, di chuyển đến vật thể nếu phát hiện, 
@@ -352,3 +392,87 @@ class Modes:
             self.relay_control.toggle_relay(False)  # Tắt relay
             self.is_watering = False  # Đặt lại trạng thái tưới cây
             print("Hoàn thành việc tưới cây.")
+            
+    def return_to_charge_station(self):
+        """Quay về trạm sạc bằng cách nhận diện đường line màu đỏ."""
+        print("Đang tìm đường về trạm sạc...")
+        while not self.manual_mode:
+            if self.sensors.detect_line_red():
+                print("Phát hiện đường line màu đỏ, đang đi theo đường...")
+                self.follow_line()  # Giả sử có hàm để đi theo đường line
+            else:
+                print("Không tìm thấy đường line màu đỏ, đang tìm kiếm...")
+                self.avoid_obstacles()  # Tránh chướng ngại vật trong khi tìm kiếm
+            sleep(0.05)
+            
+    def follow_line(self):
+        """Đi theo đường line màu đỏ."""
+        while not self.manual_mode:
+            if self.sensors.detect_line_red():
+                self.move_forward()
+            else:
+                self.adjust_direction()  # Điều chỉnh hướng nếu không phát hiện đường line
+            
+            
+    def detect_charge_station(self):
+        """Kiểm tra xem robot có đến trạm sạc hay không."""
+        # Logic để phát hiện trạm sạc
+        distance_to_station = self.ultrasonic_sensors.get_distance("front")
+        if distance_to_station is not None and distance_to_station < self.SAFE_DISTANCE:
+            print("Phát hiện trạm sạc!")
+            return True
+        return False
+    
+    def water_plants(self):
+            """Thực hiện tưới cây."""
+            if self.is_watering:
+                print("Robot đang tưới cây, không thể tưới thêm.")
+                return
+            print("Bắt đầu tưới cây...")
+            self.is_watering = True  # Đặt trạng thái tưới cây
+            self.relay_control.toggle_relay(True)  # Bật relay để tưới
+            sleep(10)  # Tưới trong 10 giây
+            self.relay_control.toggle_relay(False)  # Tắt relay
+            self.is_watering = False  # Đặt lại trạng thái tưới cây
+            print("Hoàn thành việc tưới cây.")
+    def handle_detected_object(self, obj):
+        """Xử lý vật thể đã phát hiện."""
+        print(f"Phát hiện vật thể: {obj.get('label')}")
+        distance = self.ultrasonic_sensors.get_distance("front")
+        
+        if distance > 10:
+            print(f"Khoảng cách đến vật thể: {distance} cm. Đang tiến tới...")
+            while distance > 10:
+                self.move_forward()
+                distance = self.ultrasonic_sensors.get_distance("front")
+        
+        self.stop_robot()
+        print("Đã đến gần vật thể. Bật relay...")
+        self.relay_control.toggle_relay(True)
+        sleep(2)
+        self.relay_control.toggle_relay(False)
+        print("Relay đã tắt.")
+        
+    def get_battery_level(self):
+        """Giả sử có một hàm để lấy mức pin."""
+        # Logic thực tế để lấy mức pin từ cảm biến hoặc mạch điện
+        battery_level = self.read_battery_sensor()  # Giả sử có hàm này
+        if battery_level is None:
+            print("Không thể đọc mức pin. Sử dụng giá trị mặc định 100%.")
+            return 100  # Trả về giá trị mặc định nếu không đọc được
+        return battery_level
+    
+    def should_return_to_charge_station(self):
+        """Kiểm tra mức pin để quyết định có quay về trạm sạc hay không."""
+        battery_level = self.get_battery_level()
+        if battery_level < 20:
+            print(f"Mức pin hiện tại: {battery_level}%. Quay về trạm sạc.")
+            return True
+        elif battery_level < 50:
+            print(f"Mức pin hiện tại: {battery_level}%. Cần chú ý, hãy xem xét quay về trạm sạc sớm.")
+        return False
+    
+    def has_plants_to_water(self):
+        """Kiểm tra xem có cây nào cần tưới hay không."""
+        # Giả sử có một danh sách các cây cần tưới
+        return any(plant.needs_watering for plant in self.plants)  # Cần định nghĩa plants

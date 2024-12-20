@@ -31,7 +31,7 @@ def angle_to_pwm(angle, pulse_min=150, pulse_max=600):
 # === ServoControl Class ===
 class ServoControl:
     DEFAULT_ANGLE = 60  # Góc mặc định
-    MIN_ANGLE = 10  # Giới hạn góc nhỏ nhất
+    MIN_ANGLE = 0  # Giới hạn góc nhỏ nhất
     MAX_ANGLE = 120
     def __init__(self, channel):
         self.channel = channel  # Kênh của servo trên PCA9685
@@ -80,14 +80,17 @@ class ServoControl:
             set_pwm(bus, pca9685_address, self.channel, 0, pwm_val)  # Gửi tín hiệu PWM tới kênh
             print(f"Moved servo to {self.angle} degrees.")
         else:
-            print("Angle must be between 10 and 120 degrees.")
+            print("Angle must be between 0 and 120 degrees.")
     def servo_move_to_search(self):
         """
-        Di chuyển servo từ góc nhỏ nhất đến lớn nhất để tìm vật.
+        Di chuyển servo từ góc nhỏ nhất đến lớn nhất để tìm vật,
+        dừng lại ngay khi phát hiện được vật thông qua hàm callback.
+        
+        detection_callback: Hàm kiểm tra vật được phát hiện (trả về True nếu phát hiện).
         """
         for angle in range(self.MIN_ANGLE, self.MAX_ANGLE + 1, 10):
             self.move_to_angle(angle)  # Di chuyển tới góc hiện tại
-            time.sleep(0.5)  # Dừng lại một giây tại mỗi góc để "kiểm tra"
+            time.sleep(0.5)  # Dừng lại tại mỗi góc để kiểm tra
             print(f"Searching at {angle} degrees.")
         
 

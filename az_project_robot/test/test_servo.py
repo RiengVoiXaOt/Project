@@ -39,16 +39,16 @@ set_pwm_freq(bus4, pca9685_address, 50)  # Thiết lập tần số 50Hz cho ser
 
 # Di chuyển servo qua lại
 if __name__ == "__main__":
-    servo_channel = 1  # Kênh servo 1 (kênh 0)
+    servo_channel = 0  # Kênh servo 1 (kênh 0)
     try:
         while True:
-            print("Moving servo from 10 to 120 degrees")
-            for angle in range(10, 121, 2):  # Tăng từ 10 đến 120 độ, mỗi bước 2 độ
+            print("Moving servo from 0 to 120 degrees")
+            for angle in range(0, 121, 2):  # Tăng từ 10 đến 120 độ, mỗi bước 2 độ
                 move_servo(bus4, pca9685_address, servo_channel, angle)
                 time.sleep(0.05)  # Nghỉ 50ms giữa mỗi bước
 
-            print("Moving servo from 120 to 10 degrees")
-            for angle in range(120, 9, -2):  # Giảm từ 120 về 10 độ, mỗi bước 2 độ
+            print("Moving servo from 120 to 0 degrees")
+            for angle in range(120, 0, -2):  # Giảm từ 120 về 10 độ, mỗi bước 2 độ
                 move_servo(bus4, pca9685_address, servo_channel, angle)
                 time.sleep(0.05)  # Nghỉ 50ms giữa mỗi bước
     except KeyboardInterrupt:

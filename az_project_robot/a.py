@@ -37,11 +37,11 @@ def rotate_robot(target_angle):
     if target_angle < DEFAULT_ANGLE - 5:
         # Quay xe sang phải nếu góc servo < 60
         print("Quay xe sang phải!")
-        set_motors_direction('rotate_right', 3, 0, 1)  # Xoay sang phải
+        set_motors_direction('rotate_right', 0.3, 0, 1)  # Xoay sang phải
     elif target_angle > DEFAULT_ANGLE + 5:
         # Quay xe sang trái nếu góc servo > 60
         print("Quay xe sang trái!")
-        set_motors_direction('rotate_left', -3, 0, 1)  # Xoay sang trái
+        set_motors_direction('rotate_left', -0.3, 0, 1)  # Xoay sang trái
     else:
         print("Servo đã ổn định, không cần quay xe.")
 
@@ -91,7 +91,7 @@ try:
                 # Xe đã ổn định, bắt đầu chạy thẳng về phía vật
                 print("Xe dừng xoay, bắt đầu chạy thẳng về phía vật!")
                 set_motors_direction('stop', 0, 0, 0)
-                set_motors_direction('go_forward', 5, 0, 0)  # Di chuyển xe về phía vật
+                set_motors_direction('go_forward', 0.4, 0, 0)  # Di chuyển xe về phía vật
                 is_docking = True  # Đánh dấu là xe đang chạy về vật
 
             # Kiểm tra và quay xe khi servo đã ổn định tracking
@@ -103,14 +103,14 @@ try:
 
             # Khi không tracking được vật, dừng xe và quay servo tìm lại
             if is_docking or is_moving:
-                robot.stop_robot()  # Dừng xe khi mất dấu vật
+                set_motors_direction('stop', 0, 0, 0)
                 servo.servo_move_to_search()  # Quay servo từ min tới max tìm vật
                 is_docking = False  # Đặt lại trạng thái docking
 
         # Kiểm tra cảm biến siêu âm trước để dừng xe khi tới gần vật
         front_distance = robot.ultrasonic_sensors.get_distance("front")
         if front_distance <= 15:  # Nếu khoảng cách <= 15cm
-            robot.stop_robot()  # Dừng xe khi tới gần vật
+            set_motors_direction('stop', 0, 0, 0)  # Dừng xe khi tới gần vật
             print("Xe đã tới gần vật, dừng lại.")
 
         # Nếu không có đối tượng, reset servo về góc mặc định

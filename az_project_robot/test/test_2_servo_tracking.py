@@ -10,7 +10,9 @@ from src.utils.control_utils import set_motors_direction
 DEFAULT_ANGLE = 60
 MIN_ANGLE = 10
 MAX_ANGLE = 120
-servo = ServoControl(channel=1)
+servo_1 = ServoControl(channel=1)  # Servo 1
+
+servo_2 = ServoControl(channel=0)  # Servo 2
 
 # Khởi tạo đối tượng điều khiển robot
 robot = Modes()
@@ -32,7 +34,8 @@ is_moving = False
 is_docking = False
 
 # Lưu trữ lịch sử góc servo
-servo_angle_history = []  # Lưu trữ góc servo gần đây
+servo_angle_history_1 = []  # Lưu trữ góc servo 1
+servo_angle_history_2 = []  # Lưu trữ góc servo 2
 MAX_HISTORY = 10  # Số lượng giá trị cần kiểm tra
 
 def rotate_robot(target_angle):
@@ -47,13 +50,6 @@ def servo_move_to_search(servo, cap, min_angle, max_angle, step=1, delay=0.05):
     """
     Quay servo từ min tới max và sau đó từ max tới min.
     Nếu phát hiện vật thể màu đỏ trong quá trình này, dừng lại và tiếp tục tracking.
-    
-    :param servo: Đối tượng điều khiển servo.
-    :param cap: Đối tượng camera.
-    :param min_angle: Góc tối thiểu của servo.
-    :param max_angle: Góc tối đa của servo.
-    :param step: Bước quay của servo.
-    :param delay: Thời gian tạm dừng giữa các bước quay.
     """
     # Quay từ min tới max
     for angle in range(min_angle, max_angle + 1, step):
@@ -96,7 +92,8 @@ def servo_move_to_search(servo, cap, min_angle, max_angle, step=1, delay=0.05):
             return  # Dừng lại nếu phát hiện vật thể
 
 try:
-    target_angle = DEFAULT_ANGLE  # Góc mặc định
+    target_angle_1 = DEFAULT_ANGLE  # Góc mặc định cho servo 1
+    target_angle_2 = DEFAULT_ANGLE  # Góc mặc định cho servo 2
 
     while True:
         # Đọc khung hình từ camera
@@ -124,43 +121,62 @@ try:
         if status:  # Nếu phát hiện đối tượng
             is_tracking = True
 
-            # Điều chỉnh góc servo để theo dõi vật thể
+            # Điều chỉnh góc servo 1 để theo dõi vật thể
             if deviation_x < -10:
-                target_angle += 1
-                if target_angle <= MAX_ANGLE:
-                    servo.move_to_angle(target_angle)
-                    servo_angle_history.append(target_angle)
-                    if len(servo_angle_history) > MAX_HISTORY:
-                        servo_angle_history.pop(0)
+                target_angle_1 += 1
+                if target_angle_1 <= MAX_ANGLE:
+                    servo_1.move_to_angle(target_angle_1)
+                    servo_angle_history_1.append(target_angle_1)
+                    if len(servo_angle_history_1) > MAX_HISTORY:
+                        servo_angle_history_1.pop(0)
                     sleep(0.05)
 
             elif deviation_x > 10:
-                target_angle -= 1
-                if target_angle >= MIN_ANGLE:
-                    servo.move_to_angle(target_angle)
-                    servo_angle_history.append(target_angle)
-                    if len(servo_angle_history) > MAX_HISTORY:
-                        servo_angle_history.pop(0)
+                target_angle_1 -= 1
+                if target_angle_1 >= MIN_ANGLE:
+                    servo_1.move_to_angle(target_angle_1)
+                    servo_angle_history_1.append(target_angle_1)
+                    if len(servo_angle_history_1) > MAX_HISTORY:
+                        servo_angle_history_1.pop(0)
+                    sleep(0.05)
+
+            # Điều chỉnh góc servo 2 để theo dõi vật thể
+            if deviation_y < -10:
+                target_angle_2 += 1
+                if target_angle_2 <= MAX_ANGLE:
+                    servo_2.move_to_angle(target_angle_2)
+                    servo_angle_history_2.append(target_angle_2)
+                    if len(servo_angle_history_2) > MAX_HISTORY:
+                        servo_angle_history_2.pop(0)
+                    sleep(0.05)
+
+            elif deviation_y > 10:
+                target_angle_2 -= 1
+                if target_angle_2 >= MIN_ANGLE:
+                    servo_2.move_to_angle(target_angle_2)
+                    servo_angle_history_2.append(target_angle_2)
+                    if len(servo_angle_history_2) > MAX_HISTORY:
+                        servo_angle_history_2.pop(0)
                     sleep(0.05)
 
             # Kiểm tra điều kiện di chuyển
             if abs(deviation_x) < 10 and not is_docking:
-                if len(servo_angle_history) == MAX_HISTORY and all(57 <= angle <= 63 for angle in servo_angle_history):
-                    print("Servo ổn định, robot bắt đầu di chuyển!")
+                if len(servo_angle_history_1) == MAX_HISTORY and all(57 <= angle <= 63 for angle in servo_angle_history_1):
+                    print("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     set_motors_direction('go_forward', 0.4, 0, 0)
                     is_docking = True
                 else:
-                    print("Servo chưa ổn định, chờ thêm.")
+                    print("Servo 1 chưa ổn định, chờ thêm.")
 
             # Kiểm tra và quay robot nếu cần
             if abs(deviation_x) < 15:
-                rotate_robot(target_angle)
+                rotate_robot(target_angle_1)
 
         else:
             is_tracking = False
             if is_docking or is_moving:
                 set_motors_direction('stop', 0, 0, 0)
-                servo_move_to_search(servo, cap, MIN_ANGLE, MAX_ANGLE)
+                servo_move_to_search(servo_1, cap, MIN_ANGLE, MAX_ANGLE)
                 is_docking = False
 
         # Kiểm tra cảm biến siêu âm
@@ -171,9 +187,12 @@ try:
 
         # Đưa servo về góc mặc định nếu không phát hiện vật
         if not status:
-            if target_angle != DEFAULT_ANGLE:
-                target_angle = DEFAULT_ANGLE
-                servo.move_to_angle(target_angle)
+            if target_angle_1 != DEFAULT_ANGLE:
+                target_angle_1 = DEFAULT_ANGLE
+                servo_1.move_to_angle(target_angle_1)
+            if target_angle_2 != DEFAULT_ANGLE:
+                target_angle_2 = DEFAULT_ANGLE
+                servo_2.move_to_angle(target_angle_2)
 
         cv2.imshow("Frame", frame)
         cv2.imshow("Red Mask", mask_red)

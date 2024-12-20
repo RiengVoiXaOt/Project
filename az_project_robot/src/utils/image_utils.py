@@ -230,3 +230,11 @@ def calculate_fps(t1, t2, freq):
     """
     time1 = (t2 - t1) / freq  # Tính thời gian giữa hai khung hình
     return 1 / time1  # Trả về FPS
+
+def detection_callback():
+    """
+    Hàm kiểm tra vật có được phát hiện hay không.
+    Trả về True nếu phát hiện được vật, ngược lại trả về False.
+    """
+    global status  # Biến trạng thái phát hiện vật
+    return status

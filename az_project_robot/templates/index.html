@@ -172,17 +172,17 @@
             </div>
             <!-- Manual Control Panel -->
             <div class="control-panel" id="manual-control">
-                <button onclick="sendCommand('diagonal_up_left')">↖</button>
-                <button onclick="sendCommand('forward')">↑</button>
-                <button onclick="sendCommand('diagonal_up_right')">↗</button>
-                <button onclick="sendCommand('go_left')">←</button>
-                <button onclick="sendCommand('stop')">STOP</button>
-                <button onclick="sendCommand('go_right')">→</button>
-                <button onclick="sendCommand('diagonal_down_left')">↙</button>
-                <button onclick="sendCommand('backward')">↓</button>
-                <button onclick="sendCommand('diagonal_down_right')">↘</button>
-                <button onclick="sendCommand('rotate_left')">Rotate_Left</button>
-                <button onclick="sendCommand('rotate_right')">Rotate_Right</button>
+                <button onclick="sendCommand('q')">↖</button>
+                <button onclick="sendCommand('w')">↑</button>
+                <button onclick="sendCommand('e')">↗</button>
+                <button onclick="sendCommand('a')">←</button>
+                <button onclick="sendCommand('1')">STOP</button>
+                <button onclick="sendCommand('d')">→</button>
+                <button onclick="sendCommand('z')">↙</button>
+                <button onclick="sendCommand('s')">↓</button>
+                <button onclick="sendCommand('x')">↘</button>
+                <button onclick="sendCommand('2')">Rotate_Left</button>
+                <button onclick="sendCommand('3')">Rotate_Right</button>
                 <button onclick="sendCommand('r')">Relay ON/OFF</button>
                 <button onclick="sendCommand('+')">Speed +</button>
                 <button onclick="sendCommand('-')">Speed -</button>
@@ -249,7 +249,7 @@
 
     <script>
         function sendCommand(command) {
-            fetch('/manual_control', {
+            fetch('/control', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

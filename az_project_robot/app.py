@@ -11,7 +11,7 @@ from src.vision.video_stream import VideoStream
 from queue import Queue
 from threading import Thread, Event
 import time
-from hand_control import manual_control, update_state, increase_speed, decrease_speed, move_robot, toggle_relay, control_servo, stop_robot
+from manual_control import manual_control, update_state, increase_speed, decrease_speed, move_robot, toggle_relay, control_servo, stop_robot
 
 app = Flask(__name__)
 modes = Modes()  # Khởi tạo instance
@@ -51,7 +51,6 @@ def index():
 def manual_control_api():
     data = request.json
     command = data.get('command', None)
-
     if not command:
         return jsonify({"error": "No command provided"}), 400
 

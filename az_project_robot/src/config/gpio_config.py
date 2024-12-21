@@ -1,7 +1,4 @@
 from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor  # type: ignore
-from adafruit_servokit import ServoKit
-import board
-import busio
 
 # === Motor Configuration ===
 # Cấu hình các động cơ với các chân GPIO tương ứng

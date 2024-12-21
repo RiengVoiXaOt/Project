@@ -139,7 +139,7 @@ def object_detection_loop(videostream, stop_event, frame_queue):
     - Vẽ các bounding box cho các đối tượng phát hiện được.
     """
     # Định nghĩa các tham số và đường dẫn đến mô hình
-    MODEL_NAME = '/home/az/Desktop/Project/Automated-plant-watering-robot-utilizing-computer-vision-technology'
+    MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
     GRAPH_NAME = 'detect.tflite'
     LABELMAP_NAME = 'labelmap.txt'
     min_conf_threshold = 0.7

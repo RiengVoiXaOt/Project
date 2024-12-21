@@ -9,7 +9,9 @@ from src.utils.image_utils import (
     detect_objects,
     draw_detections,
     preprocess_frame,
-    calculate_fps
+    calculate_fps,
+    analyze_detection,
+    display_info_object
 )
 # Hàm nhận diện đối tượng trong video sử dụng TensorFlow Lite
 def object_detection_loop(videostream, stop_event, frame_queue):
@@ -60,6 +62,48 @@ def object_detection_loop(videostream, stop_event, frame_queue):
         
         t2 = cv2.getTickCount()  # Lấy thời gian kết thúc
         frame_rate_calc = calculate_fps(t1, t2, freq)  # Tính FPS
+
+        # Gửi kết quả qua hàng đợi
+        if not frame_queue.full():
+            frame_queue.put(( None, frame))  # Đẩy frame vào hàng đợi
+
+def tracking_with_object_detection(videostream, stop_event, frame_queue, target_label):
+    """
+    Cơ chế tracking đối tượng với object detection.
+    """
+    MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
+    GRAPH_NAME = 'detect.tflite'
+    LABELMAP_NAME = 'labelmap.txt'
+    min_conf_threshold = 0.7
+    imW, imH = 640, 480
+    center_x, center_y = imW // 2, imH // 2
+    min_box_area = 5000
+
+    CWD_PATH = os.getcwd()
+    PATH_TO_CKPT = os.path.join(CWD_PATH, MODEL_NAME, GRAPH_NAME)
+    PATH_TO_LABELS = os.path.join(CWD_PATH, MODEL_NAME, LABELMAP_NAME)
+
+    labels = load_labels(PATH_TO_LABELS)
+    interpreter = load_model(PATH_TO_CKPT)
+    input_details, output_details, height, width, floating_model = get_model_details(interpreter)
+
+    while not stop_event.is_set():
+        frame = videostream.read()
+        if frame is None:
+            print("Cannot read frame from videostream.")
+            break
+
+        input_data = preprocess_frame(frame, width, height, floating_model)
+        detections = detect_objects(interpreter, input_data, input_details, output_details, min_conf_threshold, imW, imH)
+
+        status, deviation_x, deviation_y, x, y, w, h = analyze_detection(
+            detections, target_label, labels, imW, imH, center_x, center_y, min_box_area
+        )
+
+        if status:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+        display_info_object(frame, fps=0, status=status, deviations=(deviation_x, deviation_y), center_x=center_x, center_y=center_y, detections=detections, labels=labels)
 
         # Gửi kết quả qua hàng đợi
         if not frame_queue.full():

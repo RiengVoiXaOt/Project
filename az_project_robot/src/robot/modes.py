@@ -212,45 +212,16 @@ class Modes:
     def automatic_mode(self):
         """Chế độ tự động cho robot thực hiện nhiệm vụ."""
         print("Chế độ tự động đang chạy...")
-
         while not self.manual_mode:  # Vòng lặp chạy khi ở chế độ tự động
-            # Kiểm tra thời gian không hoạt động
-            if time() - self.last_activity_time > 300:  # 5 phút không hoạt động
-                print("Không có hoạt động trong 5 phút, tự động chuyển sang chế độ tự động.")
-                self.activate_automatic_mode()
-                self.last_activity_time = time()  # Reset thời gian hoạt động cuối cùng
-
-            # Kiểm tra đường line màu đen và điều chỉnh hướng nếu cần
-            if self.sensors.detect_line_black():
-                print("Phát hiện đường line màu đen, đang điều chỉnh hướng...")
-                self.adjust_direction()
-                self.last_activity_time = time()
-                continue
+            self.avoid_obstacles()  # Tránh chướng ngại vật
+            # Gọi các hàm khác để thực hiện nhiệm vụ như tưới cây, tìm kiếm vật thể, v.v.
             
-            # Tránh chướng ngại vật
-            self.avoid_obstacles()  
-            self.last_activity_time = time()
-
             # Kiểm tra pin và quay về trạm sạc nếu cần
-            if self.should_return_to_charge_station():
-                print("Pin yếu, đang quay về trạm sạc...")
-                self.return_to_charge_station()
-                self.last_activity_time = time()
-                continue
+            # if self.should_return_to_charge_station():
+            #     print("Pin yếu, đang quay về trạm sạc...")
+            #     self.return_to_charge_station()
+            #     continue
             
-            # Nhiệm vụ chính: tưới cây
-            if not self.is_watering and self.has_plants_to_water():
-                self.water_plants()
-                self.last_activity_time = time()
-                continue
-
-            # Tìm kiếm và xử lý vật thể khi không có nhiệm vụ khác
-            detected_object = self.find_object()
-            if detected_object:
-                print("Phát hiện vật thể:", detected_object)
-                self.handle_detected_object(detected_object)
-                self.last_activity_time = time()
-
             # Thêm một khoảng thời gian nghỉ để giảm tải CPU
             sleep(0.05)  # Giúp vòng lặp không chiếm quá nhiều tài nguyên
 
@@ -273,7 +244,51 @@ class Modes:
             if user_input.lower() == 'p':
                 self.exit_automatic_mode()
                 break
-    
+            
+    def avoid_black_line(self):
+        """Tránh đường line màu đen dựa vào cảm biến siêu âm."""
+        front_distance = self.ultrasonic_sensors.get_distance("front")
+        left_distance = self.ultrasonic_sensors.get_distance("left")
+        right_distance = self.ultrasonic_sensors.get_distance("right")
+
+        if None in (front_distance, left_distance, right_distance):
+            print("Lỗi cảm biến siêu âm: Không nhận được dữ liệu.")
+            self.stop_robot()
+            return
+
+        # Kiểm tra khoảng cách và xác định hướng di chuyển
+        distances = {'front': front_distance, 'left': left_distance, 'right': right_distance}
+        
+        # Tìm hướng có khoảng cách lớn nhất
+        max_distance_direction = max(distances, key=distances.get)
+        max_distance = distances[max_distance_direction]
+
+        # Kiểm tra khoảng cách tối thiểu an toàn
+        if max_distance < self.SAFE_DISTANCE:
+            # Nếu khoảng cách không an toàn, thực hiện hành động tương ứng
+            if max_distance_direction == 'front':
+                self.move_backward()  # Lùi lại nếu khoảng cách phía trước không an toàn
+            elif max_distance_direction == 'left':
+                set_motors_direction('go_right', self.vx, self.vy, 0)  # Xoay sang phải
+                self.update_state("turning right to avoid black line")
+            elif max_distance_direction == 'right':
+                set_motors_direction('go_left', self.vx, self.vy, 0)  # Xoay sang trái
+                self.update_state("turning left to avoid black line")
+        else:
+            # Nếu khoảng cách phía trước an toàn, tiến về phía trước
+            if max_distance_direction == 'front':
+                self.move_forward()  # Tiến về phía trước nếu khoảng cách phía trước lớn nhất
+            elif max_distance_direction == 'left':
+                set_motors_direction('go_right', self.vx, self.vy, 0)  # Xoay sang phải nếu khoảng cách bên trái lớn nhất
+                self.update_state("turning right to avoid black line")
+            elif max_distance_direction == 'right':
+                set_motors_direction('go_left', self.vx, self.vy, 0)  # Xoay sang trái nếu khoảng cách bên phải lớn nhất
+                self.update_state("turning left to avoid black line")
+            else:
+                # Nếu cả ba khoảng cách bằng nhau, ưu tiên xoay phải
+                set_motors_direction('go_right', self.vx, self.vy, 0)
+                self.update_state("turning right due to equal distances")
+        
     def find_object(self):
         """
         Tìm kiếm vật thể bằng cách quét qua servo, di chuyển đến vật thể nếu phát hiện, 
@@ -335,20 +350,6 @@ class Modes:
                         return  # Thoát hàm sau khi hoàn tất
 
         print("Không tìm thấy vật thể.")
-
-    def is_aligned_with_object(self, obj):
-        """
-        Kiểm tra xem robot đã thẳng hàng với vật thể chưa.
-        """
-        # Lấy vị trí của vật thể (giả sử có thuộc tính x, y trong obj)
-        object_x = obj.get("x")  # Tọa độ x của vật thể
-        object_y = obj.get("y")  # Tọa độ y của vật thể
-
-        # Tính toán xem robot có thẳng hàng với vật thể không
-        # Đây là một ví dụ đơn giản, bạn có thể thay đổi logic tùy theo cách tính toán của bạn
-        # Ví dụ: kiểm tra nếu object_x gần với 0 (trung tâm)
-        return abs(object_x) < 5  # Giả sử robot nằm ở x=0, điều chỉnh khoảng cách này nếu cần
-
 
     def return_to_charge_station(self):
         """Quay về trạm sạc."""

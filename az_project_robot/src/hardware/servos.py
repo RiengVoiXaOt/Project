@@ -1,6 +1,9 @@
 import smbus
 import time
 
+DEFAULT_ANGLE = 60  # Góc mặc định
+MIN_ANGLE = 0  # Giới hạn góc nhỏ nhất
+MAX_ANGLE = 120
 # === PCA9685 Configuration ===
 # Cấu hình bus I2C và địa chỉ PCA9685
 bus = smbus.SMBus(4)  # Sử dụng bus 4

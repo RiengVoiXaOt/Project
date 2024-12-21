@@ -2,25 +2,18 @@ import cv2
 import numpy as np
 from time import sleep, time
 from src.utils.image_utils import process_frame, calculate_fps, analyze_contours, display_info, detection_callback
-from src.hardware.servos import ServoControl
-from src.robot.modes import Modes
+from src.hardware.servos import ServoControl, MIN_ANGLE, MAX_ANGLE, DEFAULT_ANGLE
 from src.utils.control_utils import set_motors_direction
+# from src.hardware.ultrasonic import UltrasonicSensors
 
-# Cấu hình góc servo
-DEFAULT_ANGLE = 60
-MIN_ANGLE = 10
-MAX_ANGLE = 120
 servo_1 = ServoControl(channel=1)  # Servo 1
 servo_2 = ServoControl(channel=0)  # Servo 2
-
-# Khởi tạo đối tượng điều khiển robot
-robot = Modes()
 
 # Cấu hình camera
 cap = cv2.VideoCapture(0)
 cap.set(3, 640)  # Độ rộng khung hình
 cap.set(4, 480)  # Độ cao khung hình
-
+# Ultrasonic = UltrasonicSensors()
 # Cấu hình phân tích contour
 MIN_BOX_AREA = 500
 CENTER_X = 320
@@ -39,9 +32,13 @@ MAX_HISTORY = 10  # Số lượng giá trị cần kiểm tra
 
 def rotate_robot(target_angle):
     if target_angle < DEFAULT_ANGLE - 5:
-        set_motors_direction('rotate_right', 0.2, 0, 1)
+        set_motors_direction('rotate_right', 0.1, 0, 1)
+        sleep(0.1)
+        set_motors_direction('stop', 0, 0, 0)
     elif target_angle > DEFAULT_ANGLE + 5:
-        set_motors_direction('rotate_left', -0.2, 0, 1)
+        set_motors_direction('rotate_left', 0.1, 0, 1)
+        sleep(0.1)
+        set_motors_direction('stop', 0, 0, 0)
     else:
         print("Servo đã ổn định, không cần quay xe.")
 
@@ -108,7 +105,7 @@ try:
             is_tracking = True
 
             # Điều chỉnh góc servo 1 để theo dõi vật thể
-            if deviation_x < -10:
+            if deviation_x < -20:
                 target_angle_1 += 1
                 if target_angle_1 <= MAX_ANGLE:
                     servo_1.move_to_angle(target_angle_1)
@@ -117,7 +114,7 @@ try:
                         servo_angle_history_1.pop(0)
                     sleep(0.05)
 
-            elif deviation_x > 10:
+            elif deviation_x > 20:
                 target_angle_1 -= 1
                 if target_angle_1 >= MIN_ANGLE:
                     servo_1.move_to_angle(target_angle_1)
@@ -127,7 +124,7 @@ try:
                     sleep(0.05)
 
             # Điều chỉnh góc servo 2 để theo dõi vật thể
-            if deviation_y < -10:
+            if deviation_y < -20:
                 target_angle_2 -= 1
                 if target_angle_2 <= MAX_ANGLE:
                     servo_2.move_to_angle(target_angle_2)
@@ -136,7 +133,7 @@ try:
                         servo_angle_history_2.pop(0)
                     sleep(0.05)
 
-            elif deviation_y > 10:
+            elif deviation_y > 20:
                 target_angle_2 += 1
                 if target_angle_2 >= MIN_ANGLE:
                     servo_2.move_to_angle(target_angle_2)
@@ -158,7 +155,7 @@ try:
                     print("Servo 1 chưa ổn định, chờ thêm.")
 
             # Kiểm tra và quay robot nếu cần
-            if abs(deviation_x) < 30:
+            if abs(deviation_x) < 20:
                 rotate_robot(target_angle_1)
 
         else:
@@ -168,10 +165,12 @@ try:
                 is_docking = False
 
         # Kiểm tra cảm biến siêu âm
-        front_distance = robot.ultrasonic_sensors.get_distance("front")
-        if front_distance <= 15:
-            set_motors_direction('stop', 0, 0, 0)
-            print("Xe đã tới gần vật, dừng lại.")
+        # front_distance = Ultrasonic.get_distance("front")
+        # if front_distance <= 15:
+        #     set_motors_direction('stop', 0, 0, 0)
+        #     sleep(5)
+        #     print("Xe đã tới gần vật, dừng lại.")
+        #     print(front_distance)
 
         # Đưa servo về góc mặc định nếu không phát hiện vật
         if not status:

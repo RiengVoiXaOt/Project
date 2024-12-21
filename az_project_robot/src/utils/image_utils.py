@@ -22,7 +22,7 @@ def process_frame(frame):
     lower_red2 = np.array([170, 120, 70])
     upper_red2 = np.array([180, 255, 255])
     mask2_red = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask_red = mask1_red + mask2_red
+    mask_red = mask1_red + mask2_red    
 
     # Mask màu đen
     lower_black1 = np.array([0, 0, 0])
@@ -238,3 +238,50 @@ def detection_callback():
     """
     global status  # Biến trạng thái phát hiện vật
     return status
+def analyze_detection(detections, target_label, labels, imW, imH, center_x, center_y):
+    """
+    Phân tích các đối tượng phát hiện để xác định đối tượng cần theo dõi.
+    """
+    status = False
+    deviation_x = deviation_y = 0
+    x = y = w = h = 0  # Tọa độ mặc định
+
+    for xmin, ymin, xmax, ymax, class_id, score in detections:
+        if labels[int(class_id)] == target_label:
+
+            # Tính toán chiều rộng và chiều cao bounding box
+            w = xmax - xmin
+            h = ymax - ymin
+
+            # Tính toán tọa độ trung tâm của đối tượng
+            obj_center_x = xmin + w // 2
+            obj_center_y = ymin + h // 2
+
+            # Tính độ lệch của đối tượng so với trung tâm khung hình
+            deviation_x = obj_center_x - center_x
+            deviation_y = obj_center_y - center_y
+            # Cập nhật tọa độ của bounding box
+            x, y = xmin, ymin
+
+            status = True
+            break  # Chỉ lấy đối tượng đầu tiên tìm được
+
+    return status, deviation_x, deviation_y, x, y, w, h
+
+
+def display_info_object(frame, fps, status, deviations, center_x, center_y, detections, labels):
+    """
+    Hiển thị thông tin đối tượng lên màn hình.
+    """
+    cv2.putText(frame, f"FPS: {fps:.2f}", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    cv2.putText(frame, f"Status: {'Detected' if status else 'Not Detected'}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    deviation_x, deviation_y = deviations
+    cv2.putText(frame, f"Deviation: X={deviation_x}, Y={deviation_y}", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+
+    for idx, (xmin, ymin, xmax, ymax, class_id, score) in enumerate(detections):
+        label = labels[int(class_id)] if int(class_id) < len(labels) else "Unknown"
+        cv2.putText(frame, f"{idx + 1}: {label} ({score:.2f})", (10, 110 + idx * 30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+        cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (255, 0, 0), 2)
+
+    cv2.circle(frame, (center_x, center_y), 5, (0, 0, 255), -1)
+    cv2.imshow('Object Detection', frame)

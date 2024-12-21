@@ -1,15 +1,17 @@
 import cv2
 import numpy as np
 from time import sleep, time
-from src.hardware.servos import ServoControl
+from src.hardware.servos import ServoControl, DEFAULT_ANGLE, MAX_ANGLE, MIN_ANGLE
 from src.utils.control_utils import set_motors_direction
-
+from src.utils.image_utils import (
+    process_frame,
+    analyze_contours,
+    display_info,
+    calculate_fps
+)
 # Khởi tạo servo
 servo_1 = ServoControl(channel=1)  # Servo 1
 servo_2 = ServoControl(channel=0)  # Servo 2
-DEFAULT_ANGLE = 100  # Góc mặc định
-MIN_ANGLE = 0  # Giới hạn góc nhỏ nhất
-MAX_ANGLE = 120
 
 # Cấu hình camera
 cap = cv2.VideoCapture(0)
@@ -20,7 +22,11 @@ cap.set(4, 480)  # Độ cao khung hình
 prev_time = time()
 is_tracking = False
 
+
 try:
+    angle_1 = DEFAULT_ANGLE  # Góc mặc định cho servo 1
+    angle_2 = 90  # Góc mặc định cho servo 2
+    servo_2.move_to_angle(angle_2)
     while True:
         # Đọc khung hình từ camera
         ret, frame = cap.read()
@@ -29,21 +35,9 @@ try:
             break
 
         # Chuyển đổi khung hình sang không gian màu HSV
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-
-        # Định nghĩa khoảng màu đỏ trong không gian HSV
-        lower_red1 = np.array([0, 100, 100])
-        upper_red1 = np.array([10, 255, 255])
-        lower_red2 = np.array([160, 100, 100])
-        upper_red2 = np.array([180, 255, 255])
-
-        # Tạo mặt nạ cho màu đỏ
-        mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
-        mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
-        mask = cv2.add(mask1, mask2)
-
+        mask_red, _ = process_frame(frame)
         # Tìm contour trong mặt nạ
-        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(mask_red, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         if contours:
             # Tìm contour lớn nhất
@@ -59,11 +53,11 @@ try:
                 cv2.circle(frame, (cx, cy), 5, (255, 255, 255), -1)
 
                 # Điều khiển robot dựa trên vị trí của CX
-                if cx < 50:  # Nếu nằm bên trái
+                if cx < 100:  # Nếu nằm bên trái
                     print("Quay trái")
                     set_motors_direction('rotate_left', 0.1, 0, 0)
                     
-                elif cx > 350:  # Nếu nằm bên phải
+                elif cx > 450:  # Nếu nằm bên phải
                     print("Quay phải")
                     set_motors_direction('rotate_right', 0.1, 0, 0)
                 else:  # Nếu nằm ở giữa

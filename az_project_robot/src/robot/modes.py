@@ -246,7 +246,7 @@ class Modes:
         self.videostream.stop()
         cv2.destroyAllWindows()
 
-    def search_for_object(self, num_turns=4, step_angle=30, start_angle_1=0, start_angle_2=60):
+    def search_for_object(self, num_turns=4, step_angle=30, start_angle_1=0, start_angle_2=90):
         """
         Tìm kiếm đối tượng bằng cách quay servo xung quanh từ góc khởi đầu đến góc tối đa.
         """
@@ -257,33 +257,27 @@ class Modes:
 
         MAX_ANGLE = 120  # Giới hạn góc tối đa
         MIN_ANGLE = 0    # Giới hạn góc tối thiểu
+        for turn in range(num_turns):
+            print(f"Vòng tìm kiếm {turn + 1}/{num_turns} ở góc {target_angle_1} độ.")
 
-        for i in range(2):  # Lặp lại quá trình tìm kiếm 2 lần
-            for turn in range(num_turns):
-                print(f"Vòng tìm kiếm {turn + 1}/{num_turns} ở góc {target_angle_1} độ.")
+            # Quay servo đến góc hiện tại
+            self.bottom_servo.move_to_angle(target_angle_1)
+            self.top_servo.move_to_angle(target_angle_2)
+            sleep(1)  # Chờ một chút để servo ổn định
 
-                # Quay servo đến góc hiện tại
-                self.bottom_servo.move_to_angle(target_angle_1)
-                self.top_servo.move_to_angle(target_angle_2)
-                sleep(1)  # Chờ một chút để servo ổn định
+            # Kiểm tra có phát hiện đối tượng không từ frame_queue
+            if not self.frame_queue.empty():
+                status, _, _, _ = self.frame_queue.get()  # Lấy thông tin từ hàng đợi
+                if status:
+                    print("Đối tượng đã được phát hiện.")
+                    return target_angle_1, target_angle_2  # Trả về góc của servo
 
-                # Kiểm tra có phát hiện đối tượng không từ frame_queue
-                if not self.frame_queue.empty():
-                    status, _, _, _ = self.frame_queue.get()  # Lấy thông tin từ hàng đợi
-                    if status:
-                        print("Đối tượng đã được phát hiện.")
-                        return target_angle_1, target_angle_2  # Trả về góc của servo
+            # Cập nhật góc quay
+            target_angle_1 += step_angle
 
-                # Cập nhật góc quay
-                target_angle_1 += step_angle
-
-                # Giới hạn góc quay
-                if target_angle_1 > MAX_ANGLE:
-                    target_angle_1 = MIN_ANGLE  # Reset về góc tối thiểu nếu vượt quá tối đa
-
-            # Đưa servo 2 về vị trí cố định sau khi hoàn thành vòng quét
-            self.top_servo.move_to_angle(80)
-            self.bottom_servo.move_to_angle(MIN_ANGLE)  # Đưa servo 1 về góc khởi đầu
+            # Giới hạn góc quay
+            if target_angle_1 > MAX_ANGLE:
+                target_angle_1 = MIN_ANGLE  # Reset về góc tối thiểu nếu vượt quá tối đa
 
         print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
         return None, None  # Không tìm thấy đối tượng
@@ -433,7 +427,7 @@ class Modes:
 
         print("Không tìm thấy vật thể.")
 
-    def return_to_charge_station(self):
+    def return_to_charger(self):
         """Quay về trạm sạc."""
         if not self.charge_station_found:
             print("Searching for charge station...")

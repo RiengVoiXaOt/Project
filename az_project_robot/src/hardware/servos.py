@@ -102,7 +102,7 @@ class ServoControl:
         elif deviation_x > 10 and target_angle > seft.MIN_ANGLE:
             target_angle -= 1
             seft.move_to_angle(target_angle)
-    def tracking_servo_top(seft, deviation_y, target_angle):
+    def tracking_servo_(seft, deviation_y, target_angle):
         if deviation_y < -10 and target_angle > seft.MIN_ANGLE:
             target_angle -= 1
             seft.move_to_angle(target_angle)

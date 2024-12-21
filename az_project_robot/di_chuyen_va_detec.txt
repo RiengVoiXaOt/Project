@@ -1,2 +1,33 @@
-if status_water:
-    
+    def move_to_target()
+        lost_time = 0  # Reset thời gian khi tìm thấy đối tượng
+        servo_1.tracking_servo_bottom(deviation_x, target_angle_1)
+        servo_2.tracking_servo_bottom(deviation_y, target_angle_2)
+        if front_distance > 15:
+        # Kiểm tra điều kiện di chuyển
+            if  51 < target_angle_1 < 69 and abs(deviation_x) < 10:
+                set_motors_direction('go_forward', vx, vy, 0)
+            else:
+                print("Servo 1 chưa ổn định, chờ thêm.")
+        elif front_distance < 15:
+            set_motors_direction('stop', vx, vy, 0)
+        # Kiểm tra và quay robot nếu cần
+        if abs(deviation_x) > 40:
+            if right_distance > 15 and left_distance > 15:
+                go_right_or_left(target_angle_1, vx, vy, DEFAULT_ANGLE, 4)
+            elif 20 > abs(deviation_x) < 40:
+                rotate_robot(target_angle_1, vx, vy, DEFAULT_ANGLE, 4)
+    if status_black:
+        if y_deviation < 100 or x de_viation < 100:
+            if 
+    else:        
+        if status_water:
+            move_to_target()
+        if not status_water:
+            avoid_obtacles()
+            time+=1
+        if time = 30:
+            new_angle_1, new_angle_2 = search_for_object(servo_1, servo_2, frame_queue)
+            if new_angle_1 is not None and new_angle_2 is not None:
+                target_angle_1 = new_angle_1
+                target_angle_2 = new_angle_2
+

@@ -23,6 +23,7 @@ cap.set(4, 480)  # Độ cao khung hình
 prev_time = time()
 is_tracking = False
 is_docking = False
+is_line_following = False
 
 # Lưu trữ lịch sử góc servo
 servo_angle_history_1 = []  # Lưu trữ góc servo 1
@@ -38,10 +39,45 @@ def rotate_robot(target_angle):
         sleep(0.1)
         set_motors_direction('stop', 0, 0, 0)
 
+def follow_line(mask_red, frame):
+    contours, _ = cv2.findContours(mask_red, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if contours:
+        # Tìm contour lớn nhất
+        c = max(contours, key=cv2.contourArea)
+        M = cv2.moments(c)
+
+        if M["m00"] != 0:
+            cx = int(M['m10'] / M['m00'])
+            cy = int(M['m01'] / M['m00'])
+            print("CX: {}, CY: {}".format(cx, cy))
+
+            # Vẽ điểm trung tâm
+            cv2.circle(frame, (cx, cy), 5, (255, 255, 255), -1)
+
+            # Điều khiển robot dựa trên vị trí của CX
+            if cx < 250:  # Nếu nằm bên trái
+                print("Quay trái")
+                set_motors_direction('rotate_left', 0.1, 0, 0)
+
+            elif cx > 390:  # Nếu nằm bên phải
+                print("Quay phải")
+                set_motors_direction('rotate_right', 0.1, 0, 0)
+            else:  # Nếu nằm ở giữa
+                print("Đi thẳng")
+                set_motors_direction('go_forward', 0.1, 0, 0)
+
+            # Vẽ contour
+            cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
+        else:
+            print("Không tính được tâm")
+            set_motors_direction('stop', 0, 0, 0)
+    else:
+        print("Không thấy đường line")
+        set_motors_direction('stop', 0, 0, 0)
+
 try:
     target_angle_1 = DEFAULT_ANGLE  # Góc mặc định cho servo 1
-    target_angle_2 = 120  # Góc định sẵn cho servo 2
-    servo_2.move_to_angle(target_angle_2)
+    target_angle_2 = DEFAULT_ANGLE  # Góc định sẵn cho servo 2
 
     while True:
         # Đọc khung hình từ camera
@@ -67,7 +103,7 @@ try:
         deviations = [(deviation_x_red, deviation_y_red)]
         display_info(frame, fps, statuses, deviations, 320, 240)
 
-        if status_red:  # Nếu phát hiện line đỏ
+        if status_red and not is_line_following:  # Nếu phát hiện line đỏ khi chưa bám line
             is_tracking = True
 
             # Điều chỉnh góc servo 1 để theo dõi line đỏ
@@ -94,19 +130,16 @@ try:
                 last_three_angles = servo_angle_history_1[-3:]  # Lấy 3 góc gần nhất
                 if all(59 <= angle <= 61 for angle in last_three_angles):  # Kiểm tra khoảng
                     print("Servo 1 ổn định, robot bắt đầu di chuyển!")
-                    set_motors_direction('go_forward', 0.4, 0, 0)
-                    is_docking = True
+                    servo_2.move_to_angle(target_angle_2)
+                    is_line_following = True
 
-            # Kiểm tra và quay robot nếu cần
-            if abs(deviation_x_red) < 20:
-                rotate_robot(target_angle_1)
+        elif is_line_following:  # Khi đã sẵn sàng bám line
+            follow_line(mask_red, frame)
 
         else:  # Không phát hiện line đỏ
             is_tracking = False
-            if is_docking:
-                set_motors_direction('stop', 0, 0, 0)
-                is_docking = False
-
+            is_line_following = False
+            set_motors_direction('stop', 0, 0, 0)
             if target_angle_1 != DEFAULT_ANGLE:
                 target_angle_1 = DEFAULT_ANGLE
                 servo_1.move_to_angle(target_angle_1)

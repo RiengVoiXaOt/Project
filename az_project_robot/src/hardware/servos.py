@@ -95,6 +95,20 @@ class ServoControl:
             self.move_to_angle(angle)  # Di chuyển tới góc hiện tại
             time.sleep(0.5)  # Dừng lại tại mỗi góc để kiểm tra
             print(f"Searching at {angle} degrees.")
+    def tracking_servo_bottom(seft, deviation_x, target_angle):
+        if deviation_x < -10 and target_angle < seft.MAX_ANGLE:
+            target_angle += 1
+            seft.move_to_angle(target_angle)
+        elif deviation_x > 10 and target_angle > seft.MIN_ANGLE:
+            target_angle -= 1
+            seft.move_to_angle(target_angle)
+    def tracking_servo_top(seft, deviation_y, target_angle):
+        if deviation_y < -10 and target_angle > seft.MIN_ANGLE:
+            target_angle -= 1
+            seft.move_to_angle(target_angle)
+        elif deviation_y > 10 and target_angle < seft.MAX_ANGLE:
+            target_angle += 1
+            seft.move_to_angle(target_angle)
         
 
 # Khởi động PCA9685

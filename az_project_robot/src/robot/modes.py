@@ -1,6 +1,5 @@
 from time import sleep, time
 from src.hardware.relay import RelayControl
-from src.hardware.servos import ServoControl
 from src.hardware.motors import Motors
 from src.hardware.ultrasonic import UltrasonicSensors
 from src.vision.color_detection import color_detection_loop
@@ -8,6 +7,18 @@ from src.vision.object_detection import object_detection_loop
 from src.utils.control_utils import getch, direction, set_motors_direction
 import numpy as np
 from threading import Thread, Event
+import os
+import cv2
+import numpy as np
+from threading import Thread, Event
+from queue import Queue
+from src.vision.video_stream import VideoStream
+from src.hardware.servos import ServoControl, MIN_ANGLE, MAX_ANGLE, DEFAULT_ANGLE
+from src.utils.image_utils import load_labels, load_model, get_model_details, draw_detections, preprocess_frame, calculate_fps, analyze_detection
+import warnings
+from src.vision.object_detection import object_detection_loop  # Nhập hàm từ module bên ngoài
+
+warnings.filterwarnings("ignore", category=UserWarning, module='cv2')
 
 """
 Robot sẽ có hai chế độ hoạt động chính:
@@ -29,9 +40,18 @@ b. Chế Độ Thủ Công
 """
 
 class Modes:
+    # Định nghĩa các hằng số và thông số toàn cục
     SAFE_DISTANCE = 15  # Khoảng cách an toàn (cm)
     CRITICAL_DISTANCE = 12  # Ngưỡng cảnh báo (cm)
     MAX_HISTORY = 10  # Giới hạn lịch sử khoảng cách
+    MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
+    GRAPH_NAME = 'detect.tflite'
+    LABELMAP_NAME = 'labelmap.txt'
+    MIN_CONF_THRESHOLD = 0.7
+    IM_WIDTH, IM_HEIGHT = 640, 480
+    CENTER_X, CENTER_Y = IM_WIDTH // 2, IM_HEIGHT // 2
+    PATH_TO_CKPT = os.path.join(MODEL_NAME, GRAPH_NAME)
+    PATH_TO_LABELS = os.path.join(MODEL_NAME, LABELMAP_NAME)
 
     def __init__(self, n=None, theta=None):
         # Khởi tạo các thành phần phần cứng của robot
@@ -57,6 +77,14 @@ class Modes:
         self.active_mode = "automatic"  # Biến theo dõi chế độ hoạt động hiện tại
         self.last_activity_time = time()  # Thời gian hoạt động cuối cùng
         self.check_event = Event()  # Để kiểm soát việc kiểm tra chế độ
+        self.frame_queue = Queue(maxsize=1)  # Hàng đợi khung hình
+        self.videostream = VideoStream(resolution=(self.IM_WIDTH, self.IM_HEIGHT), framerate=30)
+        self.stop_event = Event()  # Biến để dừng luồng
+        self.is_running = False  # Trạng thái chạy
+        
+        # Khởi động luồng video
+        self.videostream.start()
+        time.sleep(1)
         ###############################Không cần chỉnh sửa các hàm này####################
     def switch_mode(self):
         """Chuyển đổi giữa chế độ tự động và chế độ thủ công."""
@@ -205,6 +233,60 @@ class Modes:
             self.rotate_robot('rotate_left')
         elif not l_state and not r_state:
             self.rotate_robot('rotate_right')
+    
+    def start_object_detection(self):
+        """Bắt đầu luồng phát hiện đối tượng."""
+        self.stop_event.clear()
+        object_thread = Thread(target=object_detection_loop, args=(self.videostream, self.stop_event, self.frame_queue, "Water"), daemon=True)
+        object_thread.start()
+
+    def stop_object_detection(self):
+        """Dừng luồng phát hiện đối tượng."""
+        self.stop_event.set()
+        self.videostream.stop()
+        cv2.destroyAllWindows()
+
+    def search_for_object(self, num_turns=4, step_angle=30, start_angle_1=0, start_angle_2=60):
+        """
+        Tìm kiếm đối tượng bằng cách quay servo xung quanh từ góc khởi đầu đến góc tối đa.
+        """
+        print("Bắt đầu tìm kiếm vật thể...")
+        
+        target_angle_1 = start_angle_1
+        target_angle_2 = start_angle_2
+
+        MAX_ANGLE = 120  # Giới hạn góc tối đa
+        MIN_ANGLE = 0    # Giới hạn góc tối thiểu
+
+        for i in range(2):  # Lặp lại quá trình tìm kiếm 2 lần
+            for turn in range(num_turns):
+                print(f"Vòng tìm kiếm {turn + 1}/{num_turns} ở góc {target_angle_1} độ.")
+
+                # Quay servo đến góc hiện tại
+                self.bottom_servo.move_to_angle(target_angle_1)
+                self.top_servo.move_to_angle(target_angle_2)
+                sleep(1)  # Chờ một chút để servo ổn định
+
+                # Kiểm tra có phát hiện đối tượng không từ frame_queue
+                if not self.frame_queue.empty():
+                    status, _, _, _ = self.frame_queue.get()  # Lấy thông tin từ hàng đợi
+                    if status:
+                        print("Đối tượng đã được phát hiện.")
+                        return target_angle_1, target_angle_2  # Trả về góc của servo
+
+                # Cập nhật góc quay
+                target_angle_1 += step_angle
+
+                # Giới hạn góc quay
+                if target_angle_1 > MAX_ANGLE:
+                    target_angle_1 = MIN_ANGLE  # Reset về góc tối thiểu nếu vượt quá tối đa
+
+            # Đưa servo 2 về vị trí cố định sau khi hoàn thành vòng quét
+            self.top_servo.move_to_angle(80)
+            self.bottom_servo.move_to_angle(MIN_ANGLE)  # Đưa servo 1 về góc khởi đầu
+
+        print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
+        return None, None  # Không tìm thấy đối tượng
 
     ###############################Không cần chỉnh sửa các hàm này####################
     

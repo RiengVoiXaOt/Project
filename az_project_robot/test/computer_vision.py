@@ -209,12 +209,12 @@ def main():
                 # Kiểm tra nếu khung hình không phải là None
                 if frame is not None:
                     cv2.imshow("Color Tracking Frame", frame)
-                if mask_red is not None:
-                    cv2.imshow("Red Mask", mask_red)
-                if mask_black is not None:
-                    cv2.imshow("Black Mask", mask_black)
-                if frame2 is not None:
-                    cv2.imshow("Object Detection Frame", frame2)  # Hiển thị frame từ nhận diện đối tượng
+                # if mask_red is not None:
+                #     cv2.imshow("Red Mask", mask_red)
+                # if mask_black is not None:
+                #     cv2.imshow("Black Mask", mask_black)
+                # if frame2 is not None:
+                #     cv2.imshow("Object Detection Frame", frame2)  # Hiển thị frame từ nhận diện đối tượng
 
             # Dừng chương trình nếu nhấn phím 'q'
             if cv2.waitKey(1) & 0xFF == ord('q'):

@@ -67,18 +67,18 @@ from src.utils.image_utils import (
 #         if not frame_queue.full():
 #             frame_queue.put(( None, frame))  # Đẩy frame vào hàng đợi
     # Định nghĩa các hằng số và thông số toàn cụcs
-MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
-GRAPH_NAME = 'detect.tflite'
-LABELMAP_NAME = 'labelmap.txt'
-MIN_CONF_THRESHOLD = 0.7
-IM_WIDTH, IM_HEIGHT = 640, 480
-CENTER_X, CENTER_Y = IM_WIDTH // 2, IM_HEIGHT // 2
-CWD_PATH = os.getcwd()
-PATH_TO_CKPT = os.path.join(CWD_PATH, MODEL_NAME, GRAPH_NAME)
-PATH_TO_LABELS = os.path.join(CWD_PATH, MODEL_NAME, LABELMAP_NAME)
+
     
 def object_detection_loop(videostream, stop_event, frame_queue):
-
+    MODEL_NAME = '/home/az/Desktop/Project/az_project_robot/models'
+    GRAPH_NAME = 'detect.tflite'
+    LABELMAP_NAME = 'labelmap.txt'
+    MIN_CONF_THRESHOLD = 0.7
+    IM_WIDTH, IM_HEIGHT = 640, 480
+    CENTER_X, CENTER_Y = IM_WIDTH // 2, IM_HEIGHT // 2
+    CWD_PATH = os.getcwd()
+    PATH_TO_CKPT = os.path.join(CWD_PATH, MODEL_NAME, GRAPH_NAME)
+    PATH_TO_LABELS = os.path.join(CWD_PATH, MODEL_NAME, LABELMAP_NAME)
     
     labels = load_labels(PATH_TO_LABELS)
     interpreter = load_model(PATH_TO_CKPT)

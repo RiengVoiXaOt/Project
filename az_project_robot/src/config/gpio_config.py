@@ -1,4 +1,4 @@
-from gpiozero import DigitalOutputDevice, PWMOutputDevice, DistanceSensor  # type: ignore
+from gpiozero import DigitalOutputDevice, DigitalInputDevice, PWMOutputDevice, DistanceSensor  # type: ignore
 
 # === Motor Configuration ===
 # Cấu hình các động cơ với các chân GPIO tương ứng
@@ -40,4 +40,4 @@ RELAY = DigitalOutputDevice(5)  # Relay để kiểm soát các thiết bị kh�
 
 # === Water Level Sensor Configuration ===
 # Mức nước đo bằng GPIO 11
-WATER_LEVEL_SENSOR = DigitalOutputDevice(11)
+WATER_LEVEL_SENSOR = DigitalInputDevice(pin=11)

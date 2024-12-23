@@ -110,7 +110,7 @@ def object_detection_loop(videostream, stop_event, frame_queue):
         cv2.putText(frame, deviation_text, (10, IM_HEIGHT - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
         
         deviation_text = f"Deviation X_charger: {deviation_x_charger:.2f}, Deviation Y_charger: {deviation_y_charger:.2f}"
-        cv2.putText(frame, deviation_text, (10, IM_HEIGHT - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.putText(frame, deviation_text, (10, IM_HEIGHT - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         # Hiển thị FPS
         frame_rate_calc = calculate_fps(t1, cv2.getTickCount(), freq)

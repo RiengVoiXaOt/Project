@@ -26,7 +26,7 @@ def main():
 
             if user_input == '1':
                 if current_mode != 'manual':
-                    modes.switch_mode()  # Chuyển sang chế độ thủ công
+                    modes.switch_mode('manual')  # Chuyển sang chế độ thủ công
                     logger.log_info("Switched to manual mode.")
                     modes.manual_control()  # Điều khiển thủ công
                     current_mode = 'manual'
@@ -35,7 +35,7 @@ def main():
 
             elif user_input == '2':
                 if current_mode != 'automatic':
-                    modes.switch_mode()  # Chuyển sang chế độ tự động
+                    modes.switch_mode('automatic')  # Chuyển sang chế độ tự động
                     logger.log_info("Switched to automatic mode.")
                     modes.automatic_mode()  # Chạy chế độ tự động
                     current_mode = 'automatic'

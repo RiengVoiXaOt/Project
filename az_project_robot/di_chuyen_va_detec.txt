@@ -72,3 +72,85 @@ def search_for_object(self, num_turns=4, step_angle=30, start_angle_1=0, start_a
 
         print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
         return None, None  # Không tìm thấy đối tượng
+
+
+
+
+
+def move_to_target(self, deviation_x, deviation_y, target_angle_bottom, target_angle_top, front_distance):
+        self.update_state("Đang tracking và di chuyển đến gần đối tượng")
+        # Điều chỉnh servo để theo dõi mục tiêu
+        self.tracking_servo_bottom(deviation_x, target_angle_bottom)
+        self.tracking_servo_top(deviation_y, target_angle_top)
+
+        # Kiểm tra khoảng cách phía trước để xác định hành động
+        if front_distance > 15:
+            if 51 < target_angle_bottom < 69 and abs(deviation_x) <= 10:
+                set_motors_direction('go_forward', self.vx, self.vy, 0)
+                self.update_state("moving forward")
+        else:
+            set_motors_direction('stop', self.vx, self.vy, 0)
+            self.update_state("stop and watering")
+            self.relay_control.run_relay_for_duration()
+
+        if abs(deviation_x) > 15:
+            self.tracking_rotate_robot(target_angle_bottom, self.DEFAULT_ANGLE_BOTTOM, 4)
+            self.update_state("rotating to target")
+
+
+
+def tracking_servo_bottom(self, deviation_x, target_angle):
+        if deviation_x < -10 and target_angle < self.MAX_ANGLE:
+            target_angle += 1
+            self.bottom_servo.move_to_angle(target_angle)
+        elif deviation_x > 10 and target_angle > self.MIN_ANGLE:
+            target_angle -= 1
+            self.bottom_servo.move_to_angle(target_angle)
+
+    def tracking_servo_top(self, deviation_y, target_angle):
+        if deviation_y < -10 and target_angle > self.MIN_ANGLE:
+            target_angle -= 1
+            self.top_servo.move_to_angle(target_angle)
+        elif deviation_y > 10 and target_angle < self.MAX_ANGLE:
+            target_angle += 1
+            self.top_servo.move_to_angle(target_angle)
+    def tracking_rotate_robot(self, target_angle, default_angle, angle):
+        if target_angle < default_angle - angle:
+            set_motors_direction('rotate_right', 0.1, 0.1, 0)
+        elif target_angle > default_angle + angle:
+            set_motors_direction('rotate_left', 0.1, 0.1, 0)
+
+def search_for_object(self, start_angle_bottom, start_angle_top, step_angle, num_turns, n):
+        """Tìm kiếm đối tượng bằng cách quay servo."""
+        target_angle_bottom = start_angle_bottom
+        target_angle_top = start_angle_top
+
+        MAX_ANGLE = 120  # Giới hạn góc tối đa
+        MIN_ANGLE = 0    # Giới hạn góc tối thiểu
+
+        for turn in range(num_turns):
+            print(f"Vòng tìm kiếm {turn + 1}/{num_turns} ở góc {target_angle_bottom} độ.")
+
+            # Quay servo đến góc hiện tại
+            self.bottom_servo.move_to_angle(target_angle_bottom)
+            self.top_servo.move_to_angle(target_angle_top)
+            sleep(1)  # Chờ một chút để servo ổn định
+
+            # Kiểm tra có phát hiện đối tượng không từ frame_queue
+            if not self.frame_queue.empty():
+                frame_data = self.frame_queue.get()  # Lấy thông tin từ hàng đợi
+                status = frame_data[n]  # Giả sử status là phần tử thứ 4 trong tuple
+
+                if status:
+                    print("Đối tượng đã được phát hiện.")
+                    return target_angle_bottom, target_angle_top  # Trả về góc của servo
+
+            # Cập nhật góc quay
+            target_angle_bottom += step_angle
+
+            # Giới hạn góc quay
+            if target_angle_bottom > MAX_ANGLE:
+                target_angle_bottom = MIN_ANGLE  # Reset về góc tối thiểu nếu vượt quá tối đa
+
+        print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
+        return None, None  # Không tìm thấy đối tượng

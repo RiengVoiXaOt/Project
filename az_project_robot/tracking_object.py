@@ -67,11 +67,9 @@ def tracking_with_object_detection(videostream, stop_event, frame_queue, target_
 def rotate_robot(target_angle):
     if target_angle < DEFAULT_ANGLE - 5:
         set_motors_direction('rotate_right', 0.1, 0, 1)
-        sleep(0.1)
         set_motors_direction('stop', 0, 0, 0)
     elif target_angle > DEFAULT_ANGLE + 5:
         set_motors_direction('rotate_left', 0.1, 0, 1)
-        sleep(0.1)
         set_motors_direction('stop', 0, 0, 0)
     else:
         print("Servo đã ổn định, không cần quay xe.")

@@ -414,6 +414,16 @@ class Modes:
                                 print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
                                 self.start_search_thread(self.MIN_ANGLE, 30, 11)
 
+                                # Chờ kết quả từ hàm quét
+                                search_thread.join()  # Đợi luồng quét kết thúc
+                                target_angle_1, target_angle_2 = self.search_for_object(
+                                    self.MIN_ANGLE, 30, 11
+                                )  # Giả sử trả về góc phát hiện
+                                if target_angle_1 is not None and target_angle_2 is not None:
+                                    print(f"Di chuyển servo đến góc ({target_angle_1}, {target_angle_2})")
+                                    self.bottom_servo.move_to_angle(target_angle_1)
+                                    self.top_servo.move_to_angle(target_angle_2)
+
                     sleep(0.05)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):

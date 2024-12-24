@@ -154,3 +154,92 @@ def search_for_object(self, start_angle_bottom, start_angle_top, step_angle, num
 
         print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
         return None, None  # Không tìm thấy đối tượng
+
+
+
+    def automatic_mode(self):
+        try:
+            while not self.stop_event.is_set():  # Vòng lặp chạy khi không dừng và không ở chế độ thủ công
+                self.daily_reset_check()
+                if not self.manual_mode:
+                    current_time = time()
+                    if not self.frame_queue.empty():
+                        frame_dict = self.process_frame()  # Xử lý khung hình từ hàng đợi
+                        self.process_results()
+                        
+                        # if frame_object is not None:
+                        #     cv2.imshow("object detection", frame_object)
+                        #     cv2.waitKey(1)
+                        
+                        # if self.check_battery_and_time():
+                            #Thực hiện nhiệm cụ tưới cây
+                            # if self.mission:
+                            #     self.check_daily_mission()
+                            #     if self.is_resting:
+                            #         self.left_charger()
+                            #     else:
+                            #         self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
+                            #         if status_water:
+                            #             last_detection_time = current_time  # Đặt lại thời gian phát hiện
+                            #             self.move_to_target(deviation_x_water, deviation_y_water, front_distance)
+                            #         elif not status_water:
+                            #             self.avoid_and_navigate(front_distance, left_distance, right_distance,front_left_distance,front_right_distance)
+                            #         elif current_time - last_detection_time >= search_interval:  # Gọi hàm tìm kiếm
+                            #             last_detection_time = current_time  # Đặt lại thời gian phát hiện
+                            # else:
+                            
+                        # if not self.is_resting:
+                        #     self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance )
+                        #     if not status_yellow:
+                        #         self.red_line_following(contours_red)
+                        #         if not status_red and not status_charger:
+                        #             self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                        #         if status_charger:
+                        #             set_motors_direction("stop", self.vx, self.vy, 0)
+                        #             sleep(0.1)
+                        #             if front_distance < 20 and status_charger:
+                        #                 self.rest_in_charger(front_distance)
+                        # else:
+                        #     self.rest_in_charger(front_distance)
+                        
+                        
+                        # else:
+                        #     #Tìm đường về trạm sạc
+                        #     if not self.is_resting:
+                        #         self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
+                        #         if not status_yellow:
+                        #             self.red_line_following(contours_red)
+                        #             if not status_red and not status_charger:
+                        #                 self.avoid_and_navigate(front_distance, left_distance, right_distance,front_left_distance,front_right_distance)
+                        #             if status_charger:
+                        #                 set_motors_direction("stop", 0.1, 0.1, 0)
+                        #                 sleep(0.05)
+                        #                 if front_distance < 25 and status_charger:
+                        #                     self.rest_in_charger(front_distance)
+                        #     else:
+                        #         self.rest_in_charger(front_distance)
+                    sleep(0.05) 
+                    
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        self.stop_event.set()
+                        break
+                else:
+                    self.update_state("Chuyển sang chế độ thủ công. Thoát khỏi tự động.")
+                    self.update_state("Automatic exited")
+                    break  # Thoát khỏi vòng lặp nếu chuyển sang chế độ thủ công
+
+                # Thêm log để theo dõi trạng thái
+                print(f"Manual Mode: {self.manual_mode}, Stop Event: {self.stop_event.is_set()}")
+                
+            color_thread.join()
+            object_thread.join()
+
+            sleep(0.1)  # Thêm thời gian nghỉ để giảm tải CPU
+        except Exception as e:
+            print(f"Error in automatic mode: {e}")
+            
+        finally:
+            self.stop_event.set()  # Đặt cờ dừng
+            if 'videostream' in locals():
+                self.videostream.stop()  # Dừng video stream
+            cv2.destroyAllWindows()  # Đóng tất cả cửa sổ OpenCV

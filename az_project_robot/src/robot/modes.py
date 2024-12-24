@@ -394,9 +394,9 @@ class Modes:
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
                         
-                        if frame_object is not None:
-                            cv2.imshow("object detection", frame_object)
-                            cv2.waitKey(1)
+                        # if frame_object is not None:
+                        #     cv2.imshow("object detection", frame_object)
+                        #     cv2.waitKey(1)
                         
                         # if self.check_battery_and_time():
                             #Thực hiện nhiệm cụ tưới cây
@@ -425,7 +425,7 @@ class Modes:
                                 if status_charger:
                                     set_motors_direction("stop", self.vx, self.vy, 0)
                                     sleep(0.1)
-                                    if front_distance < 20 and status_red:
+                                    if front_distance < 20 and status_charger:
                                         self.rest_in_charger(front_distance)
                         else:
                             self.rest_in_charger(front_distance)
@@ -444,7 +444,7 @@ class Modes:
                         #                     self.rest_in_charger(front_distance)
                         #     else:
                         #         self.rest_in_charger(front_distance)
-                            
+                    sleep(0.05) 
                     
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.stop_event.set()
@@ -481,9 +481,9 @@ class Modes:
     def rest_in_charger(self, front_distance):
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
         if front_distance > 5:
-            self.set_motors_direction("go_forward",self.vx - 0.2, self.vy - 0.2, 0)
+            self.set_motors_direction("go_forward",self.vx, self.vy, 0)
         else:
-            self.set_motors_direction("stop", self.vx - 0.2, self.vy - 0.2, 0)  # Dừng động cơ
+            self.set_motors_direction("stop", self.vx, self.vy, 0)  # Dừng động cơ
         self.update_direction("Dừng di chuyển")
         self.update_state("Đang nghỉ ngơi tại trạm sạc")
         self.is_resting = True

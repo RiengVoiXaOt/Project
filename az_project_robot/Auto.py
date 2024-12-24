@@ -125,11 +125,11 @@ def rest_in_charger(servo_1, servo_2, DEFAULT_ANGLE):
     servo_1.move_to_angle(DEFAULT_ANGLE)
     servo_2.move_to_angle(DEFAULT_ANGLE)
     set_motors_direction('stop', 0, 0, 0)
-def handle_black_line(status_black, deviation_x_black, deviation_y_black):
-    if status_black:
-        if abs(deviation_x_black) < 200 or abs(deviation_y_black) < 200:
+def handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow):
+    if status_yellow:
+        if abs(deviation_x_yellow) < 200 or abs(deviation_y_yellow) < 200:
             set_motors_direction('rotate_left', 0.1, 0.1, 0)
-        if deviation_y_black > 30 and deviation_x_black == 0:
+        if deviation_y_yellow > 30 and deviation_x_yellow == 0:
             set_motors_direction('rotate_right', 0.1, 0.1, 0)
 
 def avoid_obstacles(front_distance, left_distance, right_distance, vx, vy, safe_distance=15, critical_distance=10):
@@ -241,8 +241,8 @@ def Auto():
         while not stop_event.is_set():
             if not frame_queue.empty():
                 # Lấy dữ liệu từ hàng đợi
-                (frame_color, mask_red, mask_black, status_red, deviation_x_red, deviation_y_red,
-                 status_black, deviation_x_black, deviation_y_black, contours_black, contours_red,
+                (frame_color, mask_red, mask_yellow, status_red, deviation_x_red, deviation_y_red,
+                 status_yellow, deviation_x_yellow, deviation_y_yellow, contours_yellow, contours_red,
                  status_water, status_charger, deviation_x_water, deviation_y_water,
                  deviation_x_charger, deviation_y_charger, frame_object) = frame_queue.get()
                 
@@ -265,8 +265,8 @@ def Auto():
                                 rest_in_charger(servo_1, servo_2, DEFAULT_ANGLE)  
                             else:
                                 print("Ko ở tại trạm sạc, đi tìm")
-                                handle_black_line(status_black, deviation_x_black, deviation_y_black)
-                                if not status_black:
+                                handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
+                                if not status_yellow:
                                     avoid_and_navigate(front_distance, left_distance, right_distance, vx, vy)
                                     red_line_following(contours_red)
                                     if status_water:
@@ -280,8 +280,8 @@ def Auto():
 
                         else:
                             left_charger()
-                            if status_black:
-                                handle_black_line(status_black, deviation_x_black, deviation_y_black)
+                            if status_yellow:
+                                handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
                             else:
                                 avoid_and_navigate(front_distance, left_distance, right_distance, vx, vy)
                                 if status_water:
@@ -297,8 +297,8 @@ def Auto():
                         if front_distance < 10 and status_charger:
                             rest_in_charger(servo_1, servo_2, DEFAULT_ANGLE)
                         else:
-                            handle_black_line(status_black, deviation_x_black, deviation_y_black)
-                            if not status_black:
+                            handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
+                            if not status_yellow:
                                 avoid_and_navigate(front_distance, left_distance, right_distance, vx, vy)
                                 red_line_following(contours_red)
                                 if status_water:
@@ -315,8 +315,8 @@ def Auto():
                     if front_distance < 10 and status_charger:
                         rest_in_charger(servo_1, servo_2, DEFAULT_ANGLE)
                     else:
-                        handle_black_line(status_black, deviation_x_black, deviation_y_black)
-                        if not status_black:
+                        handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
+                        if not status_yellow:
                             avoid_and_navigate(front_distance, left_distance, right_distance, vx, vy)
                             red_line_following(contours_red)
                             if status_water:

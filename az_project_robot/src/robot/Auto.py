@@ -1,195 +1,205 @@
-from src.vision.object_detection import object_detection_loop
-from src.vision.color_detection import color_detection_loop
-from src.hardware.battery import BatteryMonitor
-from src.vision.video_stream import VideoStream
-from threading import Thread, Event, Lock
-from queue import Queue
-from time import sleep
-import cv2
-from datetime import datetime
-from src.utils.control_utils import set_motors_direction, go_right_or_left, rotate_robot
-from src.robot.modes import Modes
-from src.hardware.servos import ServoControl, DEFAULT_ANGLE
+from time import sleep, time
 from src.hardware.relay import RelayControl
+from src.hardware.motors import Motors
 from src.hardware.ultrasonic import UltrasonicSensors
+from src.vision.color_detection import color_detection_loop
+from src.vision.object_detection import object_detection_loop
+from src.utils.control_utils import getch, direction, set_motors_direction
+from src.hardware.servos import ServoControl
+from src.utils.image_utils import load_labels, load_model, get_model_details, draw_detections, preprocess_frame, calculate_fps, analyze_detection
+from src.vision.video_stream import VideoStream
+from src.hardware.battery import BatteryMonitor
+from threading import Thread, Event, Lock
+from datetime import datetime
+from queue import Queue
+import numpy as np
+import os
+import cv2
 
-OPERATION_START_TIME = datetime.now().replace(hour=12, minute=40,second=0)
-now = datetime.now()
-relay_control = RelayControl(5)
-battery = BatteryMonitor()
-_, _, _, battery_percentage, _ = battery.read_battery_status()
-a = Modes()
-ultrasonic_sensors=UltrasonicSensors()
-servo_1 = ServoControl(channel=1)
-servo_2 = ServoControl(channel=0)
-vx =0.1, vy =0.1
-def move_to_target(
-    servo_1, servo_2, 
-    deviation_x, deviation_y, 
-    target_angle_1, target_angle_2, 
-    vx, vy, relay_control,
-    front_distance, right_distance, left_distance,
-    DEFAULT_ANGLE
-):
-    """
-    Điều khiển robot di chuyển đến vị trí mục tiêu.
-    """
-    # Điều chỉnh servo để theo dõi mục tiêu
-    servo_1.tracking_servo_bottom(deviation_x, target_angle_1)
-    servo_2.tracking_servo_bottom(deviation_y, target_angle_2)
+class RobotController:
+    def __init__(self):
+        self.stop_event = Event()
+        self.manual_mode = False
+        self.is_resting = False
+        self.mission = True
+        self.daily_mission = 10
+        self.current_mission_count = 0
+        self.firtstart = True
 
-    # Kiểm tra khoảng cách phía trước để xác định hành động
-    if front_distance > 15:
-        # Di chuyển thẳng nếu servo ổn định
-        if 51 < target_angle_1 < 69 and abs(deviation_x) < 10:
-            print("Di chuyển thẳng về phía mục tiêu.")
-            set_motors_direction('go_forward', vx, vy, 0)
-        else:
-            print("Servo chưa ổn định, chờ thêm.")
-    else:
-        # Dừng robot nếu khoảng cách phía trước quá gần
-        print("Khoảng cách phía trước quá gần, dừng lại.")
-        set_motors_direction('stop', 0, 0, 0)
-        relay_control.run_relay_for_duration()
+        # Servo-related parameters
+        self.MIN_ANGLE = 0
+        self.MAX_ANGLE = 120
+        self.DEFAULT_ANGLE_BOTTOM = 60
+        self.DEFAULT_ANGLE_TOP = 90
+        self.target_angle_1 = self.DEFAULT_ANGLE_BOTTOM
+        self.target_angle_2 = self.DEFAULT_ANGLE_TOP
 
-    # Kiểm tra và quay robot nếu cần
-    if abs(deviation_x) > 40:
-        if right_distance > 15 and left_distance > 15:
-            print("Quay robot để điều chỉnh góc nhìn.")
-            go_right_or_left(target_angle_1, vx, vy, DEFAULT_ANGLE, 4)
-        elif 20 <= abs(deviation_x) < 40:
-            print("Hiệu chỉnh góc robot.")
-            rotate_robot(target_angle_1, vx, vy, DEFAULT_ANGLE, 4)
+        # State tracking
+        self.status_charger_history = []
+        self.status_water_history = []
+        self.servo_angle_history_bottom = []
+        self.servo_angle_history_top = []
+        self.MAX_HISTORY = 5
+        self.reset_threshold = 3
 
-def red_line_following(contours):
-    if contours:
-        c = max(contours, key=cv2.contourArea)
-        M = cv2.moments(c)
-        if M["m00"] != 0:
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            if cx < 100:  
-                set_motors_direction('rotate_left', 0.1, 0, 0)              
-            elif cx > 450:  
-                set_motors_direction('rotate_right', 0.1, 0, 0)
-            else:  
-                set_motors_direction('go_forward', 0.1, 0, 0)
-    else:
-        set_motors_direction('stop', 0, 0, 0)
+        # Other parameters
+        self.OPERATION_START_TIME = datetime.strptime("06:00", "%H:%M").time()
+        self.OPERATION_END_TIME = datetime.strptime("20:00", "%H:%M").time()
+        self.SAFE_DISTANCE = 5.0  # Example value
+        
+        # Initialize sensors, motors, and other components
+        self.init_components()
 
-def left_charger():
-    set_motors_direction('go_backward', 0.1, 0.1, 0)
-    sleep(1)
-    set_motors_direction('rotate_left', 0.1, 0.1, 0)
-    sleep(1)
-def rest_in_charger(servo_1, servo_2, DEFAULT_ANGLE):
-    servo_1.move_to_angle = DEFAULT_ANGLE
-    servo_2.move_to_angle = DEFAULT_ANGLE
-    set_motors_direction('stop', 0, 0, 0)
-def handle_black_line(status_black, deviation_x_black, deviation_y_black):
-    if status_black:
-        if abs(deviation_x_black) < 180 or abs(deviation_y_black) < 180:
-            set_motors_direction('rotate_left', 0.1, 0.1, 0)
-        if deviation_y_black > 30 and deviation_x_black == 0:
-            set_motors_direction('rotate_right', 0.1, 0.1, 0)
-# Định dạng thời gian theo ý muốn
-def Auto():
-    stop_event = Event()
-    frame_queue = Queue(maxsize=1)
-    mission = False
-    try:
-        # Khởi tạo VideoStream
-        videostream = VideoStream(resolution=(640, 480), framerate=30).start()
-        sleep(1)
+    def init_components(self):
+        self.ultrasonic_sensors = UltrasonicSensors()
+        self.bottom_servo = ServoControl(channel=1)
+        self.top_servo = ServoControl(channel=0)
+        self.relay_control = RelayControl()
+        self.battery = BatteryMonitor()
 
-        # Bắt đầu nhận diện màu sắc trong một thread riêng với giới hạn FPS
-        color_thread = Thread(target=color_detection_loop, args=(videostream, 320, 240, 1000, stop_event, frame_queue, 10), daemon=True)
-        color_thread.start()
+    def start_video_stream(self):
+        self.videostream = VideoStream().start()
 
-        # Bắt đầu nhận diện đối tượng trong một thread riêng
-        object_thread = Thread(target=object_detection_loop, args=(videostream, stop_event, frame_queue), daemon=True)
-        object_thread.start()
-        while not stop_event.is_set():
-            if not frame_queue.empty():
-                # Lấy dữ liệu từ hàng đợi
-                (frame_color, mask_red, mask_black, status_red, deviation_x_red, deviation_y_red,
-                status_black, deviation_x_black, deviation_y_black, contours_black, contours_red,
-                status_water, status_charger, deviation_x_water, deviation_y_water,
-                deviation_x_charger, deviation_y_charger, frame_object) = frame_queue.get()
+    def start_color_detection(self):
+        return Thread(target=self.color_detection, daemon=True).start()
 
-                front_distance = ultrasonic_sensors.get_distance("front")
-                left_distance = ultrasonic_sensors.get_distance("left")
-                right_distance = ultrasonic_sensors.get_distance("right")
+    def start_object_detection(self):
+        return Thread(target=self.object_detection, daemon=True).start()
 
-                # Kiểm tra xem đã đến thời điểm hoạt động chưa
-                if now >= OPERATION_START_TIME:
-                    print(f"Robot bắt đầu hoạt động vào {now.strftime('%Y-%m-%d %H:%M:%S')}")
-                    if battery_percentage > 25:
-                        if not mission:
-                            rest_in_charger()  
-                        else:
-                            left_charger()
-                            if status_black:
-                                if abs(deviation_x_black) < 180 or abs(deviation_y_black) < 180:
-                                    set_motors_direction('rotate_left', 0.1, 0.1, 0)
-                                if deviation_y_black > 30 and deviation_x_black == 0:
-                                    set_motors_direction('rotate_right', 0.1, 0.1, 0)
-                            else:
-                                a.avoid_obstacles()
-                                if status_water:
-                                    move_to_target(servo_1, servo_2, deviation_x_water, deviation_y_water, target_angle_1, target_angle_2, vx, vy, relay_control, front_distance, right_distance, left_distance, DEFAULT_ANGLE)
-                                else:
-                                    time += 1
-                                    if time >= 60:
-                                        new_angle_1, new_angle_2 = a.search_for_object(servo_1, servo_2, frame_queue)
-                                        if new_angle_1 is not None and new_angle_2 is not None:
-                                            target_angle_1, target_angle_2 = new_angle_1, new_angle_2
-                    else:
-                        if front_distance < 10 and status_charger:
-                            rest_in_charger()
-                        else:
-                            handle_black_line(status_black, deviation_x_black, deviation_y_black)
-                            if not status_black:
-                                a.avoid_obstacles()
-                                red_line_following(contours_red)
-                                if status_water:
-                                    move_to_target(servo_1, servo_2, deviation_x_charger, deviation_y_charger, target_angle_1, target_angle_2, vx, vy, relay_control, front_distance, right_distance, left_distance, DEFAULT_ANGLE)
-                                else:
-                                    time += 1
-                                    if time >= 60:
-                                        new_angle_1, new_angle_2 = a.search_for_object(servo_1, servo_2, frame_queue)
-                                        if new_angle_1 is not None and new_angle_2 is not None:
-                                            target_angle_1, target_angle_2 = new_angle_1, new_angle_2
+    def automatic_mode(self):
+        self.start_video_stream()
+        color_thread = self.start_color_detection()
+        object_thread = self.start_object_detection()
+        print("Chế độ tự động đang chạy...")
+
+        try:
+            while not self.stop_event.is_set():
+                self.daily_reset_check()
+                if not self.manual_mode:
+                    self.handle_automatic_tasks()
                 else:
-                    if front_distance < 10 and status_charger:
-                        rest_in_charger()
-                    else:
-                        handle_black_line(status_black, deviation_x_black, deviation_y_black)
-                        if not status_black:
-                            a.avoid_obstacles()
-                            red_line_following(contours_red)
-                            if status_water:
-                                move_to_target(servo_1, servo_2, deviation_x_charger, deviation_y_charger, target_angle_1, target_angle_2, vx, vy, relay_control, front_distance, right_distance, left_distance, DEFAULT_ANGLE)
-                            else:
-                                time += 1
-                                if time >= 60:
-                                    new_angle_1, new_angle_2 = a.search_for_object(servo_1, servo_2, frame_queue)
-                                    if new_angle_1 is not None and new_angle_2 is not None:
-                                        target_angle_1, target_angle_2 = new_angle_1, new_angle_2
+                    print("Chuyển sang chế độ thủ công. Thoát khỏi tự động.")
+                    break
 
-                    # Dừng chương trình nếu nhấn phím 'q'
-                    if cv2.waitKey(1) & 0xFF == ord('q'):
-                        stop_event.set()
-                        break
+                print(f"Manual Mode: {self.manual_mode}, Stop Event: {self.stop_event.is_set()}")
 
-        color_thread.join()
-        object_thread.join()
-    except Exception as e:
-        print(f"Error: {e}")
-    finally:
-        stop_event.set()
-        videostream.stop()
-        cv2.destroyAllWindows()
+            color_thread.join()
+            object_thread.join()
+            sleep(0.1)
 
-if __name__ == "__main__":
-    Auto()  # Chạy chương trình khi thực thi script
+        except Exception as e:
+            print(f"Error in automatic mode: {e}")
+
+        finally:
+            self.stop_event.set()
+            if hasattr(self, 'videostream'):
+                self.videostream.stop()
+            cv2.destroyAllWindows()
+
+    def handle_automatic_tasks(self):
+        current_time = time()
+        if not self.frame_queue.empty():
+            frame_dict = self.process_frame()
+
+            distances = {
+                "front": self.ultrasonic_sensors.get_distance("front"),
+                "left": self.ultrasonic_sensors.get_distance("left"),
+                "right": self.ultrasonic_sensors.get_distance("right"),
+                "front_left": self.ultrasonic_sensors.get_distance("front_left"),
+                "front_right": self.ultrasonic_sensors.get_distance("front_right"),
+            }
+
+            if self.firtstart:
+                sleep(3)
+                self.firtstart = False
+
+            # Extract frame data
+            status_red = frame_dict["status_red"]
+            status_black = frame_dict["status_black"]
+            deviation_x_black = frame_dict["deviation_x_black"]
+            deviation_y_black = frame_dict["deviation_y_black"]
+            status_charger = frame_dict["status_charger"]
+            deviation_x_charger = frame_dict["deviation_x_charger"]
+            deviation_y_charger = frame_dict["deviation_y_charger"]
+            deviation_x_water = frame_dict["deviation_x_water"]
+            deviation_y_water = frame_dict["deviation_y_water"]
+            status_water = frame_dict["status_water"]
+            contours_red = frame_dict["contours_red"]
+
+            if self.check_battery_and_time():
+                if self.mission:
+                    self.execute_watering_task(
+                        status_black, deviation_x_black, deviation_y_black,
+                        status_water, distances
+                    )
+                else:
+                    self.return_to_charger(
+                        status_black, deviation_x_black, deviation_y_black,
+                        status_red, status_charger, distances
+                    )
+
+            else:
+                self.return_to_charger(
+                    status_black, deviation_x_black, deviation_y_black,
+                    status_red, status_charger, distances
+                )
+
+    def execute_watering_task(self, status_black, deviation_x_black, deviation_y_black, status_water, distances):
+        self.handle_black_line(status_black, deviation_x_black, deviation_y_black)
+
+        if status_water:
+            self.move_to_target(deviation_x_water, deviation_y_water, distances["front"])
+        else:
+            self.avoid_and_navigate(distances)
+            if time > 200:
+                self.start_search_thread(self.MIN_ANGLE, 30, 11)
+
+    def return_to_charger(self, status_black, deviation_x_black, deviation_y_black, status_red, status_charger, distances):
+        self.handle_black_line(status_black, deviation_x_black, deviation_y_black)
+
+        if not status_black:
+            self.red_line_following(contours_red)
+
+            if not status_red and not status_charger:
+                self.avoid_and_navigate(distances)
+
+            if status_charger:
+                self.rest_in_charger(distances["front"])
+
+    def check_battery_and_time(self):
+        now = datetime.now()
+        if self.OPERATION_START_TIME <= now.time() <= self.OPERATION_END_TIME:
+            return self.battery.read_battery_status()[3] > 25
+        return False
+
+    def rest_in_charger(self, front_distance):
+        if front_distance > 4.7:
+            self.set_motors_direction("go_forward", 0.09, 0.09, 0)
+        self.set_motors_direction("stop", 0, 0, 0)
+        self.is_resting = True
+
+    def reset_daily_mission(self):
+        self.current_mission_count = 0
+        self.mission = True
+        print("Đã reset nhiệm vụ hàng ngày.")
+
+    def daily_reset_check(self):
+        current_time = datetime.now()
+        if current_time.hour == 0 and current_time.minute == 0:
+            self.reset_daily_mission()
+
+    def move_to_target(self, deviation_x, deviation_y, front_distance):
+        # Movement logic for target tracking
+        pass
+
+    def avoid_and_navigate(self, distances):
+        # Obstacle avoidance logic
+        pass
+
+    def red_line_following(self, contours_red):
+        # Logic for red line following
+        pass
+
+    def handle_black_line(self, status_black, deviation_x_black, deviation_y_black):
+        # Logic to handle black line detection
+        pass

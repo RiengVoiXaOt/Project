@@ -55,7 +55,7 @@ try:
             break
 
         # Xử lý khung hình
-        mask_red, mask_black = process_frame(frame)
+        mask_red, mask_yellow = process_frame(frame)
 
         # Phân tích đường line đỏ
         status_red, deviation_x_red, deviation_y_red, _, _, _, _, _ = analyze_contours(
@@ -63,8 +63,8 @@ try:
         )
 
         # Phân tích đường line đen
-        status_black, _, _, _, _, _, _, _ = analyze_contours(
-            mask_black, CENTER_X, CENTER_Y, MIN_BOX_AREA, "black"
+        status_yellow, _, _, _, _, _, _, _ = analyze_contours(
+            mask_yellow, CENTER_X, CENTER_Y, MIN_BOX_AREA, "yellow"
         )
 
         # Tính FPS
@@ -73,11 +73,11 @@ try:
         prev_time = current_time
 
         # Hiển thị thông tin lên khung hình
-        statuses = [status_red, status_black]
+        statuses = [status_red, status_yellow]
         deviations = [(deviation_x_red, deviation_y_red)]
         display_info(frame, fps, statuses, deviations, CENTER_X, CENTER_Y)
 
-        # if status_black:  # Nếu phát hiện line đen
+        # if status_yellow:  # Nếu phát hiện line đen
         #     print("Phát hiện line đen, điều chỉnh hướng!")
         #     set_motors_direction('stop', 0, 0, 0)
         #     sleep(0.1)
@@ -155,7 +155,7 @@ try:
 
         cv2.imshow("Frame", frame)
         cv2.imshow("Red Mask", mask_red)
-        #cv2.imshow("Black Mask", mask_black)
+        #cv2.imshow("yellow Mask", mask_yellow)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 

@@ -36,19 +36,19 @@ def main():
     while not stop_event.is_set():
         if not frame_queue.empty():
             # Lấy dữ liệu từ hàng đợi
-            frame, mask_red, mask_black, status_red, deviation_x_red,deviation_y_red, status_black,deviation_x_black,deviation_y_black,contours_black,contours_red,_,_,_,_,_,_,_ = (frame_queue.get())
+            frame, mask_red, mask_yellow, status_red, deviation_x_red,deviation_y_red, status_yellow,deviation_x_yellow,deviation_y_yellow,contours_yellow,contours_red,_,_,_,_,_,_,_ = (frame_queue.get())
 
             # Hiển thị các khung hình
             if frame is not None:
                 cv2.imshow("Red Mask", frame)
 
             # Nếu phát hiện đối tượng
-            if status_black:
-                if abs(deviation_x_black) or abs(deviation_y_black) < 180:
+            if status_yellow:
+                if abs(deviation_x_yellow) or abs(deviation_y_yellow) < 180:
                     set_motors_direction('rotate_left', 0.1, 0.1, 0)
-                if deviation_y_black > 30 and deviation_x_black == 0:
+                if deviation_y_yellow > 30 and deviation_x_yellow == 0:
                     set_motors_direction('rotate_right', 0.1, 0.1, 0)
-            if not status_black:
+            if not status_yellow:
                 set_motors_direction('go_forward', 0.1, 0.1, 0)
         # Dừng chương trình nếu nhấn phím 'q'
         if cv2.waitKey(1) & 0xFF == ord('q'):

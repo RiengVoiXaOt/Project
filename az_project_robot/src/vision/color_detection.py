@@ -36,30 +36,30 @@ from src.utils.image_utils import (
 #         t1 = cv2.getTickCount()  # Bắt đầu theo dõi thời gian
 
 #         # Phân tích khung hình để tạo mask cho màu đỏ và đen
-#         mask_red, mask_black = process_frame(frame)
+#         mask_red, mask_yellow = process_frame(frame)
 
 #         # Phân tích các contour để tìm các đối tượng trong vùng mask
 #         status_red, x_r, y_r, contours_red, x_red, y_red, w_red, h_red = analyze_contours(mask_red, center_x, center_y, min_box_area, "red")
-#         status_black, x_b, y_b, contours_black, x_black, y_black, w_black, h_black = analyze_contours(mask_black, center_x, center_y, min_box_area, "black")
+#         status_yellow, x_b, y_b, contours_yellow, x_yellow, y_yellow, w_yellow, h_yellow = analyze_contours(mask_yellow, center_x, center_y, min_box_area, "yellow")
 
 #         # Chuyển status thành chuỗi để hiển thị trên video
 #         status_red = str(status_red)
-#         status_black = str(status_black)
+#         status_yellow = str(status_yellow)
         
 #         # Vẽ kết quả (cập nhật vào frame)
 #         if contours_red:
 #             cv2.rectangle(frame, (x_red, y_red), (x_red + w_red, y_red + h_red), (0, 0, 255), 2)
 #             cv2.circle(frame, (x_red + w_red // 2, y_red + h_red // 2), 5, (0, 0, 255), -1)
-#         if contours_black:
-#             cv2.rectangle(frame, (x_black, y_black), (x_black + w_black, y_black + h_black), (255, 255, 255), 2)
-#             cv2.circle(frame, (x_black + w_black // 2, y_black + h_black // 2), 5, (255, 255, 255), -1)
+#         if contours_yellow:
+#             cv2.rectangle(frame, (x_yellow, y_yellow), (x_yellow + w_yellow, y_yellow + h_yellow), (255, 255, 255), 2)
+#             cv2.circle(frame, (x_yellow + w_yellow // 2, y_yellow + h_yellow // 2), 5, (255, 255, 255), -1)
 
 #         # Gửi kết quả qua hàng đợi để truyền cho phần hiển thị
 #         if not frame_queue.full():
 #             frame_queue.put((frame, None))
 
 #         # Hiển thị thông tin FPS và các kết quả trên video
-#         display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [status_red, status_black], [(x_r, y_r), (x_b, y_b)], center_x, center_y)
+#         display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [status_red, status_yellow], [(x_r, y_r), (x_b, y_b)], center_x, center_y)
         
 #         t2 = cv2.getTickCount()  # Lấy thời gian kết thúc
 #         frame_rate_calc = calculate_fps(t1, t2, freq)  # Tính FPS
@@ -84,18 +84,18 @@ def color_detection_loop(videostream, center_x, center_y, min_box_area, stop_eve
 
         t1 = cv2.getTickCount()
 
-        mask_red, mask_black = process_frame(frame)
+        mask_red, mask_yellow = process_frame(frame)
         status_red, x_r, y_r, contours_red, x_red, y_red, w_red, h_red = analyze_contours(mask_red, center_x, center_y, min_box_area, "red")
-        status_black, x_b, y_b, contours_black, x_black, y_black, w_black, h_black = analyze_contours(mask_black, center_x, center_y, min_box_area, "black")
+        status_yellow, x_b, y_b, contours_yellow, x_yellow, y_yellow, w_yellow, h_yellow = analyze_contours(mask_yellow, center_x, center_y, min_box_area, "yellow")
 
         # Gửi kết quả vào hàng đợi
         deviation_x_red = (x_red + w_red // 2) - center_x if contours_red else 0
         deviation_y_red = (y_r + h_red // 2) - center_y if contours_red else 0
-        deviation_x_black = (x_black + w_black // 2) - center_x if contours_red else 0
-        deviation_y_black = (y_black + h_black // 2) - center_y if contours_red else 0
-        frame_queue.put((frame, mask_red, mask_black, status_red, deviation_x_red,deviation_y_red, status_black,deviation_x_black,deviation_y_black,contours_black,contours_red,None,None,None,None,None,None,None))
+        deviation_x_yellow = (x_yellow + w_yellow // 2) - center_x if contours_red else 0
+        deviation_y_yellow = (y_yellow + h_yellow // 2) - center_y if contours_red else 0
+        frame_queue.put((frame, mask_red, mask_yellow, status_red, deviation_x_red,deviation_y_red, status_yellow,deviation_x_yellow,deviation_y_yellow,contours_yellow,contours_red,None,None,None,None,None,None,None))
 
-        display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [str(status_red), str(status_black)], [(x_r, y_r), (x_b, y_b)], center_x, center_y)
+        display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [str(status_red), str(status_yellow)], [(x_r, y_r), (x_b, y_b)], center_x, center_y)
 
         t2 = cv2.getTickCount()
         frame_rate_calc = calculate_fps(t1, t2, freq)

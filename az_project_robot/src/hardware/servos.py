@@ -81,7 +81,6 @@ class ServoControl:
             self.angle = target_angle
             pwm_val = angle_to_pwm(self.angle)
             set_pwm(bus, pca9685_address, self.channel, 0, pwm_val)  # Gửi tín hiệu PWM tới kênh
-            print(f"Moved servo to {self.angle} degrees.")
         else:
             print("Angle must be between 0 and 120 degrees.")
     def servo_move_to_search(self):

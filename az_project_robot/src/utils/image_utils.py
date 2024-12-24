@@ -12,7 +12,7 @@ def process_frame(frame):
     Xác định dải màu đỏ (hai phần, vì đỏ nằm ở hai đầu phổ HSV).
     Tạo các mask cho màu đỏ (cv2.inRange) và kết hợp chúng (mask1_red + mask2_red).
     Xác định dải màu đen và tạo mask tương ứng.
-    Trả về hai mask: mask_red và mask_black.
+    Trả về hai mask: mask_red và mask_yellow.
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # Mask màu đỏ
@@ -24,17 +24,12 @@ def process_frame(frame):
     mask2_red = cv2.inRange(hsv, lower_red2, upper_red2)
     mask_red = mask1_red + mask2_red    
 
-    # Mask màu đen
-    lower_black1 = np.array([0, 0, 0])
-    upper_black1 = np.array([180, 255, 50])
-    mask_black1 = cv2.inRange(hsv, lower_black1, upper_black1)
+    # Mask for yellow (adjusted for bright yellow only)
+    lower_yellow = np.array([25, 150, 150])
+    upper_yellow = np.array([35, 255, 255])
+    mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
 
-    lower_black2 = np.array([0, 0, 0])
-    upper_black2 = np.array([180, 255, 80])
-    mask_black2 = cv2.inRange(hsv, lower_black2, upper_black2)
-    mask_black = mask_black1 + mask_black2
-
-    return mask_red, mask_black
+    return mask_red, mask_yellow
 
 
 # Phân tích contour của đối tượng

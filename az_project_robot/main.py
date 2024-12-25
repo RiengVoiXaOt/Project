@@ -14,7 +14,7 @@ def main():
     logger = Logger()
     logger.log_info("Robot system starting...")
     motors = Motors()
-    modes = Modes(n=3, theta=0)
+    modes = Modes()
     
     current_mode = None  # Biến theo dõi chế độ hiện tại
 

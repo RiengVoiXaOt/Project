@@ -101,8 +101,8 @@ class Modes:
         self.set_motors_direction = set_motors_direction
         
         # Đưa servo về góc mặc định
-        self.target_angle_1 = self.DEFAULT_ANGLE_BOTTOM  # Góc ban đầu của servo dưới
-        self.target_angle_2 = self.DEFAULT_ANGLE_TOP  # Góc ban đầu của servo trên
+        self.bottom_angle = self.DEFAULT_ANGLE_BOTTOM  # Góc ban đầu của servo dưới
+        self.top_angle = self.DEFAULT_ANGLE_TOP  # Góc ban đầu của servo trên
         self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
         self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
         
@@ -403,23 +403,28 @@ class Modes:
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
                         
-                        if frame_object is not None:
-                            cv2.imshow("object detection", frame_object)
-                            cv2.waitKey(1)
+                        # if frame_object is not None:
+                        #     cv2.imshow("object detection", frame_object)
+                        #     cv2.waitKey(1)
                             
                         self.check_tracking_water(status_water)
-                        
                         if status_water:  # Nếu phát hiện cây cần tưới
                             last_detection_time = current_time  # Cập nhật thời gian phát hiện
                             if search_thread and search_thread.is_alive():
                                 self.stop_search_thread()  # Dừng luồng tìm kiếm nếu đang chạy
                             self.move_to_target(deviation_x_water, deviation_y_water, front_distance)
                         elif current_time - last_detection_time >= search_interval:  # Nếu quá thời gian quét lại
-                            self.is_tracking_warter = False
                             last_detection_time = current_time  # Cập nhật thời gian tìm kiếm
                             if not search_thread or not search_thread.is_alive():
                                 print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
                                 self.start_search_thread(self.MIN_ANGLE, 20, 11)
+                                target_angle_bottom, target_angle_top = search_thread.result  # Nhận kết quả từ luồng tìm kiếm
+                                if target_angle_bottom is not None:
+                                    self.bottom_servo.move_to_angle(target_angle_bottom)
+                                    self.top_servo.move_to_angle(target_angle_top)
+                                else:
+                                    print("Không phát hiện được đối tượng.")
+
 
                     sleep(0.05)
 
@@ -472,78 +477,75 @@ class Modes:
     #################################Object Tracking###########################################
     def water_plants(self):
         self.update_state("Đang thực hiện tưới cây")
-        self.relay_control.run_relay_for_duration()
+        # Giả lập hoạt động relay tưới cây
+        print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
-        self.check_daily_mission()  # Kiểm tra xem đã hoàn thành nhiệm vụ chưa
+        self.check_daily_mission()
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 2:
-            self.set_motors_direction('rotate_right',self.vx, self.vy, 1)
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 5:
+            self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay phải")
-            sleep(0.05)
-            self.set_motors_direction('stop', self.vx, self.vy, 1)
-        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 2:
+        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 5:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay trái")
-            sleep(0.05)
-            self.set_motors_direction('stop', self.vx, self.vy, 1)
             
     def move_to_target(self, deviation_x, deviation_y, front_distance):
         self.update_state("Đang tracking đối tượng")
-        target_angle_1 = self.target_angle_1  # Sử dụng giá trị góc hiện tại của servo dưới
-        target_angle_2 = self.target_angle_2  # Sử dụng giá trị góc hiện tại của servo trên
+        bottom_angle = self.bottom_angle  # Sử dụng giá trị góc hiện tại của servo dưới
+        top_angle = self.top_angle  # Sử dụng giá trị góc hiện tại của servo trên
 
         # Điều chỉnh góc servo dưới
         if deviation_x < -15:
-            target_angle_1 += 1
-            if target_angle_1 <= self.MAX_ANGLE:
-                self.bottom_servo.move_to_angle(target_angle_1)
-                self.servo_angle_history_bottom.append(target_angle_1)
+            bottom_angle += 1
+            if bottom_angle <= self.MAX_ANGLE:
+                self.bottom_servo.move_to_angle(bottom_angle)
+                self.servo_angle_history_bottom.append(bottom_angle)
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
         elif deviation_x > 15:
-            target_angle_1 -= 1
-            if target_angle_1 >= self.MIN_ANGLE:
-                self.bottom_servo.move_to_angle(target_angle_1)
-                self.servo_angle_history_bottom.append(target_angle_1)
+            bottom_angle -= 1
+            if bottom_angle >= self.MIN_ANGLE:
+                self.bottom_servo.move_to_angle(bottom_angle)
+                self.servo_angle_history_bottom.append(bottom_angle)
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
         # Điều chỉnh góc servo trên
         if deviation_y < -15:
-            target_angle_2 -= 1
-            if target_angle_2 <= self.MAX_ANGLE:
-                self.top_servo.move_to_angle(target_angle_2)
-                self.servo_angle_history_top.append(target_angle_2)
+            top_angle -= 1
+            if top_angle <= self.MAX_ANGLE:
+                self.top_servo.move_to_angle(top_angle)
+                self.servo_angle_history_top.append(top_angle)
                 if len(self.servo_angle_history_top) > self.MAX_HISTORY:
                     self.servo_angle_history_top.pop(0)
         elif deviation_y > 15:
-            target_angle_2 += 1
-            if target_angle_2 >= self.MIN_ANGLE:
-                self.top_servo.move_to_angle(target_angle_2)
-                self.servo_angle_history_top.append(target_angle_2)
+            top_angle += 1
+            if top_angle >= self.MIN_ANGLE:
+                self.top_servo.move_to_angle(top_angle)
+                self.servo_angle_history_top.append(top_angle)
                 if len(self.servo_angle_history_top) > self.MAX_HISTORY:
                     self.servo_angle_history_top.pop(0)
 
         # Lưu lại góc hiện tại sau khi điều chỉnh
-        self.target_angle_1 = target_angle_1
-        self.target_angle_2 = target_angle_2
+        self.bottom_angle = bottom_angle
+        self.top_angle = top_angle
 
-        if abs(deviation_x) > 15:
-            self.rotate_robot_tracking(self.target_angle_1)
+        if abs(deviation_x) > 15 and abs(deviation_y):
+            self.rotate_robot_tracking(self.bottom_angle)
             
-        if front_distance <= self.SAFE_DISTANCE and target_angle_1:
-            self.set_motors_direction('stop', self.vx, self.vy, 0)
-            self.update_state("Xe đã tới gần vật, dừng lại.")
-            self.water_plants()
-        else:
-            if len(self.servo_angle_history_bottom) >= 3:
-                last_three_angles = self.servo_angle_history_bottom[-3:]
-                if all(58 <= angle <= 62 for angle in last_three_angles) and deviation_x < 15:
-                    self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
-                    self.set_motors_direction('go_forward', self.vx, self.vy, 0)
-
-    ################################ ??????????????###############################
+        # if front_distance <= self.SAFE_DISTANCE and bottom_angle:
+        #     self.set_motors_direction('stop', self.vx, self.vy, 0)
+        #     self.update_state("Xe đã tới gần vật, dừng lại.")
+        #     self.water_plants()
+        # else:
+        #     if len(self.servo_angle_history_bottom) >= 3:
+        #         last_three_angles = self.servo_angle_history_bottom[-3:]
+        #         if all(58 <= angle <= 62 for angle in last_three_angles) and deviation_x < 15:
+        #             self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
+        #             self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+                
+    ################################ ?????????????? ###############################
     def reset_servo_to_default(self):
         print("Đưa servo về góc mặc định.")
         self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
@@ -562,9 +564,9 @@ class Modes:
         self.status_water_history.append(status_water)
         if len(self.status_water_history) > self.reset_threshold:
             self.status_water_history.pop(0)  # Xóa trạng thái cũ nhất
-        # Kiểm tra nếu không có giá trị True trong 3 giá trị gần nhất
+
         if all(not status for status in self.status_water_history):
-            self.is_tracking_warter = False  # Reset servo nếu không có giá trị True 
+            self.is_tracking_warter = False  # Không theo dõi nữa
         else:
             self.is_tracking_warter = True
             
@@ -600,32 +602,30 @@ class Modes:
     def search_for_object(self, start_angle, step_angle, number):
         """Hàm quét tìm đối tượng."""
         self.update_state("Đang quét tìm kiếm đối tượng...")
-        target_angle_1 = start_angle
-        target_angle_2 = self.DEFAULT_ANGLE_TOP
+        bottom_angle = start_angle
+        top_angle = self.DEFAULT_ANGLE_TOP
 
         while not self.stop_search_event.is_set():  # Kiểm tra nếu cần dừng tìm kiếm
-            while target_angle_2 >= 50:
-                self.bottom_servo.move_to_angle(target_angle_1)
-                self.top_servo.move_to_angle(target_angle_2)
+            while top_angle >= 50:
+                self.bottom_servo.move_to_angle(bottom_angle)
+                self.top_servo.move_to_angle(top_angle)
                 sleep(1)  # Giảm thời gian chờ
 
                 if not self.frame_queue.empty():
                     frame_data = self.frame_queue.get()
-                    if frame_data is None or not isinstance(frame_data[number], bool):
-                        continue  # Bỏ qua khung hình lỗi
-
                     status = frame_data[number]
                     if status or self.is_tracking_warter:
-                        self.update_state(f"Đối tượng phát hiện tại góc ({target_angle_1}, {target_angle_2})")
-                        return  # Kết thúc tìm kiếm khi phát hiện đối tượng
+                        self.update_state(f"Đối tượng phát hiện tại góc ({bottom_angle}, {top_angle})")
+                        return bottom_angle, top_angle # Kết thúc tìm kiếm khi phát hiện đối tượng
 
                 # Cập nhật góc quét
-                if target_angle_1 < self.MAX_ANGLE:
-                    target_angle_1 += step_angle
+                if bottom_angle < self.MAX_ANGLE:
+                    bottom_angle += step_angle
                 else:
-                    target_angle_1 = self.MIN_ANGLE
-                    target_angle_2 -= 20  # Giảm góc của servo trên
-            self.reset_servo_to_default()    
+                    bottom_angle = self.MIN_ANGLE
+                    top_angle -= 20  # Giảm góc của servo trên
+            self.is_tracking_warter = False
+            self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
             return
         
@@ -638,8 +638,8 @@ class Modes:
         while not self.result_queue.empty():
             result = self.result_queue.get()
             if result is not None:
-                target_angle_1, target_angle_2 = result
-                print(f"Đối tượng được phát hiện tại góc: {target_angle_1}, {target_angle_2}")
+                bottom_angle, top_angle = result
+                print(f"Đối tượng được phát hiện tại góc: {bottom_angle}, {top_angle}")
             else:
                 print("Không phát hiện được đối tượng.")
                 
@@ -649,3 +649,4 @@ class Modes:
             self.stop_search_event.set()  # Đặt cờ dừng
         if hasattr(self, 'search_thread') and self.search_thread.is_alive():
             self.search_thread.join()  # Đợi luồng kết thúc
+    ##################################gggggggggggggg######################################

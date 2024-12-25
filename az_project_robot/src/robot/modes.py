@@ -355,6 +355,7 @@ class Modes:
         }
     ################################ Các hàm liên quan đến điều khiển tự động ################################
     def automatic_mode(self):
+        self.n = 2
         self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
         self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
         self.start_video_stream()  # Khởi động luồng video
@@ -383,7 +384,7 @@ class Modes:
                         front_right_distance = self.ultrasonic_sensors.get_distance("front_right")
                         if self.firtstart:
                             sleep(3)
-                            self.firtstart = False
+                            self.firtstart = False 
                             
                         # Lấy các giá trị từ từ điển
                         status_red = frame_dict["status_red"]
@@ -401,6 +402,11 @@ class Modes:
                         mask_red = frame_dict["mask_red"]
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
+                        
+                        # if frame_object is not None:
+                        #     cv2.imshow("object detection", frame_object)
+                        #     cv2.waitKey(1)
+                        print(front_distance)
                         print(self.bottom_angle, self.top_angle)
                         self.check_tracking_water(status_water)
                         if status_water:  # Nếu phát hiện cây cần tưới
@@ -470,19 +476,19 @@ class Modes:
     #################################Object Tracking###########################################
     def water_plants(self):
         self.update_state("Đang thực hiện tưới cây")
-        # Giả lập hoạt động relay tưới cây
+        self.relay_control.run_relay_for_duration()
         print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
         self.check_daily_mission()
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 3:
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 4:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay phải")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
-        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 3:
+        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 4:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay trái")
             sleep(0.2)
@@ -490,6 +496,7 @@ class Modes:
             
     def move_to_target(self, deviation_x, deviation_y, front_distance):
         self.update_state("Đang tracking đối tượng")
+        self.update_state("huhu")
         bottom_angle = self.bottom_angle  # Sử dụng giá trị góc hiện tại của servo dưới
         top_angle = self.top_angle  # Sử dụng giá trị góc hiện tại của servo trên
 
@@ -528,19 +535,22 @@ class Modes:
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if abs(deviation_x) <30 and abs(deviation_y) < 30:
+        if 15 < abs(deviation_x) <= 200 and 15 < abs(deviation_y) <= 200:
             self.rotate_robot_tracking(self.bottom_angle)
             
-        # if front_distance <= self.SAFE_DISTANCE and bottom_angle:
-        #     self.set_motors_direction('stop', self.vx, self.vy, 0)
-        #     self.update_state("Xe đã tới gần vật, dừng lại.")
-        #     self.water_plants()
-        # else:
-        #     if len(self.servo_angle_history_bottom) >= 3:
-        #         last_three_angles = self.servo_angle_history_bottom[-3:]
-        #         if all(58 <= angle <= 62 for angle in last_three_angles) and deviation_x < 15:
-        #             self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
-        #             self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+        if front_distance <= 18:
+            self.set_motors_direction('stop', self.vx, self.vy, 0)
+            self.update_state("Xe đã tới gần vật, dừng lại.")
+            self.water_plants()
+            
+        elif front_distance > self.SAFE_DISTANCE and abs(deviation_x) <= 15 and abs(deviation_y) <= 15:
+            if len(self.servo_angle_history_bottom) >= 3:
+                last_three_angles = self.servo_angle_history_bottom[-3:]
+                if all(55 <= angle <= 65 for angle in last_three_angles):
+                    self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
+                    self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+                    sleep(0.5)
+                    self.set_motors_direction('stop', self.vx, self.vy, 0)
                 
     ################################ ?????????????? ###############################
     def reset_servo_to_default(self):
@@ -600,7 +610,7 @@ class Modes:
         """Hàm quét tìm đối tượng."""
         self.update_state("Đang quét tìm kiếm đối tượng...")
         bottom_angle = start_angle
-        top_angle = self.DEFAULT_ANGLE_TOP
+        top_angle = 110
 
         while not self.stop_search_event.is_set():  # Kiểm tra nếu cần dừng tìm kiếm
             while top_angle >= 50:

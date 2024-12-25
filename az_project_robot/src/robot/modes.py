@@ -363,7 +363,7 @@ class Modes:
 
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
-        search_interval = 30  # Thời gian tìm kiếm lại (60 giây)
+        search_interval = 15  # Thời gian tìm kiếm lại (60 giây)
 
         print("Chế độ tự động đang chạy...")
         try:
@@ -375,7 +375,6 @@ class Modes:
                     # Xử lý khung hình từ hàng đợi
                     if not self.frame_queue.empty():
                         frame_dict = self.process_frame()
-                        self.process_results()
                         
                         front_distance = self.ultrasonic_sensors.get_distance("front")
                         left_distance = self.ultrasonic_sensors.get_distance("left")
@@ -402,11 +401,7 @@ class Modes:
                         mask_red = frame_dict["mask_red"]
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
-                        
-                        # if frame_object is not None:
-                        #     cv2.imshow("object detection", frame_object)
-                        #     cv2.waitKey(1)
-                            
+                        print(self.bottom_angle, self.top_angle)
                         self.check_tracking_water(status_water)
                         if status_water:  # Nếu phát hiện cây cần tưới
                             last_detection_time = current_time  # Cập nhật thời gian phát hiện
@@ -414,18 +409,16 @@ class Modes:
                                 self.stop_search_thread()  # Dừng luồng tìm kiếm nếu đang chạy
                             self.move_to_target(deviation_x_water, deviation_y_water, front_distance)
                         elif current_time - last_detection_time >= search_interval:  # Nếu quá thời gian quét lại
+                            self.search_object = True
                             last_detection_time = current_time  # Cập nhật thời gian tìm kiếm
                             if not search_thread or not search_thread.is_alive():
                                 print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
-                                self.start_search_thread(self.MIN_ANGLE, 20, 11)
-                                target_angle_bottom, target_angle_top = search_thread.result  # Nhận kết quả từ luồng tìm kiếm
-                                if target_angle_bottom is not None:
-                                    self.bottom_servo.move_to_angle(target_angle_bottom)
-                                    self.top_servo.move_to_angle(target_angle_top)
-                                else:
-                                    print("Không phát hiện được đối tượng.")
-
-
+                                self.start_search_thread(self.MIN_ANGLE, 2, 11)
+                                self.set_motors_direction("stop", self.vx, self.vy, 0 )
+                        elif self.bottom_angle != self.DEFAULT_ANGLE_BOTTOM and self.top_angle != self.DEFAULT_ANGLE_TOP and not self.is_tracking_warter and not self.search_object:
+                            self.bottom_servo.move_to_angle(self.bottom_angle)
+                            self.top_servo.move_to_angle(self.top_angle)
+                            
                     sleep(0.05)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -484,12 +477,16 @@ class Modes:
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 5:
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 3:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay phải")
-        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 5:
+            sleep(0.2)
+            self.set_motors_direction('stop', self.vx, self.vy, 1)
+        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 3:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay trái")
+            sleep(0.2)
+            self.set_motors_direction('stop', self.vx, self.vy, 1)
             
     def move_to_target(self, deviation_x, deviation_y, front_distance):
         self.update_state("Đang tracking đối tượng")
@@ -531,7 +528,7 @@ class Modes:
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if abs(deviation_x) > 15 and abs(deviation_y):
+        if abs(deviation_x) <30 and abs(deviation_y) < 30:
             self.rotate_robot_tracking(self.bottom_angle)
             
         # if front_distance <= self.SAFE_DISTANCE and bottom_angle:
@@ -609,14 +606,18 @@ class Modes:
             while top_angle >= 50:
                 self.bottom_servo.move_to_angle(bottom_angle)
                 self.top_servo.move_to_angle(top_angle)
-                sleep(1)  # Giảm thời gian chờ
+                sleep(0.05)  # Giảm thời gian chờ
 
                 if not self.frame_queue.empty():
                     frame_data = self.frame_queue.get()
                     status = frame_data[number]
                     if status or self.is_tracking_warter:
                         self.update_state(f"Đối tượng phát hiện tại góc ({bottom_angle}, {top_angle})")
-                        return bottom_angle, top_angle # Kết thúc tìm kiếm khi phát hiện đối tượng
+                        self.top_angle = top_angle
+                        self.bottom_angle = bottom_angle
+                        self.result_queue.put((bottom_angle, top_angle))  # Đẩy kết quả vào hàng đợi
+                        self.search_object = False
+                        return  # Kết thúc tìm kiếm khi phát hiện đối tượng
 
                 # Cập nhật góc quét
                 if bottom_angle < self.MAX_ANGLE:
@@ -624,29 +625,21 @@ class Modes:
                 else:
                     bottom_angle = self.MIN_ANGLE
                     top_angle -= 20  # Giảm góc của servo trên
+             
+            self.search_object = False       
             self.is_tracking_warter = False
             self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
-            return
-        
+            self.result_queue.put(None)  # Đẩy None vào hàng đợi khi không phát hiện được đối tượng
+            
     def start_search_thread(self, start_angle, step_angle, number):
+        self.stop_search_event.clear()  # Đảm bảo cờ dừng được reset
         self.search_thread = Thread(target=self.search_for_object, args=(start_angle, step_angle, number), daemon=True)
         self.search_thread.start()
 
-    def process_results(self):
-        # Kiểm tra kết quả từ hàng đợi
-        while not self.result_queue.empty():
-            result = self.result_queue.get()
-            if result is not None:
-                bottom_angle, top_angle = result
-                print(f"Đối tượng được phát hiện tại góc: {bottom_angle}, {top_angle}")
-            else:
-                print("Không phát hiện được đối tượng.")
-                
     def stop_search_thread(self):
         """Dừng luồng tìm kiếm."""
-        if hasattr(self, 'stop_search_event') and self.stop_search_event:
-            self.stop_search_event.set()  # Đặt cờ dừng
-        if hasattr(self, 'search_thread') and self.search_thread.is_alive():
+        self.stop_search_event.set()  # Đặt cờ dừng
+        if self.search_thread and self.search_thread.is_alive():
             self.search_thread.join()  # Đợi luồng kết thúc
     ##################################gggggggggggggg######################################

@@ -64,26 +64,14 @@ def mode():
 
 # Route: Điều khiển robot (manual)
 @app.route('/control', methods=['POST'])
-def manual_control_api():
-    data = request.json
-    command = data.get('command', None)
-    if not command:
-        return jsonify({"error": "No command provided"}), 400
+def control_robot():
+    command = request.json.get('command')
+    if command:
+        robot.execute_command(command)  # Gọi hàm execute_command
+        return jsonify({'status': 'Command received', 'command': command})
+    return jsonify({'status': 'No command provided'}), 400
 
-    if command in ['+', '=', '-', '_', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'x', 'r', '7', '8', '9', '0']:
-        if command in ['+', '=']:
-            increase_speed()
-        elif command in ['-', '_']:
-            decrease_speed()
-        elif command in ['w', 'a', 's', 'd', 'q', 'e', 'z', 'x']:
-            move_robot(command)
-        elif command == 'r':
-            toggle_relay()
-        elif command in ['7', '8', '9', '0']:
-            control_servo(command)
-        return jsonify({"status": "Command executed successfully", "current_state": state})
 
-    return jsonify({"error": "Invalid command"}), 400
 
 # Route: Lệnh chế độ tự động
 @app.route('/auto-command', methods=['POST'])

@@ -1,7 +1,7 @@
-from flask import Flask, render_template, Response, jsonify, request
 from src.robot.modes import Modes
+from flask import Flask, render_template, Response, jsonify, request
 import threading
-import cv2
+
 app = Flask(__name__)
 robot = Modes()
 
@@ -14,9 +14,9 @@ def index():
 @app.route('/video_feed/<string:camera>')
 def video_feed(camera):
     if camera == "color":
-        return Response(generate_video(robot.automatic_mode.color_thread), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(generate_video(robot.videostream.color_stream), mimetype='multipart/x-mixed-replace; boundary=frame')
     elif camera == "object":
-        return Response(generate_video(robot.automatic_mode.object_thread), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(generate_video(robot.videostream.object_stream), mimetype='multipart/x-mixed-replace; boundary=frame')
     else:
         return "Invalid camera source", 400
 
@@ -36,10 +36,10 @@ def status():
     sensor_data = robot.get_sensor_data()
     battery_status = robot.battery.read_battery_status()
     return jsonify({
-        "battery": battery_status[0],
-        "voltage": battery_status[1],
-        "current": battery_status[2],
-        "power": battery_status[3],
+        "voltage": battery_status[0],
+        "current": battery_status[1],
+        "power": battery_status[2],
+        "battery": battery_status[3],
         "remaining_time": battery_status[4],
         "water": robot.is_watering,
         "wheel_speed": robot.vx,
@@ -64,14 +64,11 @@ def mode():
 
 # Route: Điều khiển robot (manual)
 @app.route('/control', methods=['POST'])
-def control_robot():
-    command = request.json.get('command')
-    if command:
-        robot.execute_command(command)  # Gọi hàm execute_command
-        return jsonify({'status': 'Command received', 'command': command})
-    return jsonify({'status': 'No command provided'}), 400
-
-
+def control():
+    data = request.get_json()
+    command = data.get("command")
+    robot.manual_control(command)
+    return jsonify({"success": True})
 
 # Route: Lệnh chế độ tự động
 @app.route('/auto-command', methods=['POST'])

@@ -264,15 +264,6 @@
                     img.src = img.src.split('?')[0] + '?' + new Date().getTime(); // Bypass caching
                 }, 100);
 
-        <!-- function sendCommand(command) {
-            fetch('/control', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ command: command })
-            }).catch(err => console.error('Failed to send command', err));
-        } -->
         function sendCommand(command) {
             fetch('/control', {
                 method: 'POST',
@@ -280,11 +271,7 @@
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ command: command })
-            }).then(response => {
-                if (response.ok) {
-                    console.log("Command sent: " + command);
-                }
-            });
+            }).catch(err => console.error('Failed to send command', err));
         }
         // lay mode dieu khien xe
         function getMode(){

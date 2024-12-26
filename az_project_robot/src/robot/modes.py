@@ -36,8 +36,8 @@ b. Chế Độ Thủ Công
 """
 
 class Modes:
-    SAFE_DISTANCE = 20  # Khoảng cách an toàn (cm)
-    CRITICAL_DISTANCE = 15  # Ngưỡng cảnh báo (cm)
+    SAFE_DISTANCE = 30  # Khoảng cách an toàn (cm)
+    CRITICAL_DISTANCE = 20  # Ngưỡng cảnh báo (cm)
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
@@ -257,12 +257,6 @@ class Modes:
             elif left_distance <= self.CRITICAL_DISTANCE:
                 self.set_motors_direction('go_right', self.vx, self.vy, 0)
                 self.update_direction("going right")
-            # elif front_left_distance < left_distance and front_left_distance < :
-            #     self.set_motors_direction('rotate_right', self.vx, self.vy, 0)
-            #     self.update_direction("rotate_right")
-            # elif front_right_distance < right_distance:
-            #     self.set_motors_direction('rotate_left', self.vx, self.vy, 0)
-            #     self.update_direction("rotate_left")
             elif front_left_distance <= self.SAFE_DISTANCE:
                 self.set_motors_direction('rotate_right', self.vx, self.vy, 0)
                 self.update_direction("rotate_right")
@@ -440,6 +434,9 @@ class Modes:
                         
                         print(self.current_state)
                         
+                        self.return_to_charger_station(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
+                            status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance)
+                        
                         last_detection_time = self.handle_water_mission(
                             status_yellow, deviation_x_yellow, deviation_y_yellow, 
                             left_distance, right_distance, status_water, 
@@ -447,7 +444,6 @@ class Modes:
                             current_time, last_detection_time, search_interval, 
                             search_thread, front_left_distance, front_right_distance
                         )
-                        
                     sleep(0.05)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -456,7 +452,6 @@ class Modes:
                 else:
                     self.update_state("Chuyển sang chế độ thủ công. Thoát khỏi tự động.")
                     break  # Thoát khỏi vòng lặp nếu chuyển sang chế độ thủ công
-
             color_thread.join()
             object_thread.join()
 
@@ -468,8 +463,7 @@ class Modes:
             if 'videostream' in locals():
                 self.videostream.stop()  # Dừng video stream
             cv2.destroyAllWindows()  # Đóng tất cả cửa sổ OpenCV
-    
-    
+    #######################################Main############################################
     def handle_water_mission(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
                          status_water, deviation_x_water, deviation_y_water, front_distance, 
                          current_time, last_detection_time, search_interval, search_thread,
@@ -514,16 +508,36 @@ class Modes:
 
         return last_detection_time
     
+    def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
+                         status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance):
+        
+        if status_yellow:
+            self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
+            self.current_state = "avoid_line"
+        # Khi không có đường màu vàng
+        elif not status_yellow:
+            if status_charger:
+                self.rest_in_charger(front_distance)
+            elif status_red:
+                self.red_line_following(contours_red)
+                self.current_state = "following red line"  
+            else:
+                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                self.current_state = "move"
+         
     ################################ Charging station ###############################3
     def rest_in_charger(self, front_distance):
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
         if front_distance > 5:
-            self.set_motors_direction("go_forward",self.vx, self.vy, 0)
+            self.update_state("Di chuyển về phía trước để gần trạm sạc")
+            self.set_motors_direction("go_forward", self.vx, self.vy, 0)
+            sleep(0.1)
+            self.set_motors_direction("stop", self.vx, self.vy, 0)
         else:
             self.set_motors_direction("stop", self.vx, self.vy, 0)  # Dừng động cơ
-        self.update_direction("Dừng di chuyển")
-        self.update_state("Đang nghỉ ngơi tại trạm sạc")
-        self.is_resting = True
+            self.update_direction("Dừng di chuyển")
+            self.update_state("Đang nghỉ ngơi tại trạm sạc")
+            self.is_resting = True
         
     def left_charger(self):
         """Đi lùi và quay sang trái để vào trạm sạc."""
@@ -560,7 +574,7 @@ class Modes:
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 2:
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 6:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay phải điều chỉnh góc")
             sleep(0.2)
@@ -574,6 +588,7 @@ class Modes:
     def move_to_target(self, deviation_x, deviation_y, front_distance, right_distance, left_distance):
         self.update_state("Đang tracking đối tượng")
         self.update_state("tracking")
+        print(deviation_x, deviation_y)
         bottom_angle = self.bottom_angle  # Sử dụng giá trị góc hiện tại của servo dưới
         top_angle = self.top_angle  # Sử dụng giá trị góc hiện tại của servo trên
 
@@ -612,7 +627,7 @@ class Modes:
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if 15 < abs(deviation_x) <= 50 and 15 < abs(deviation_y) <= 50  :
+        if (15 < abs(deviation_x) <= 50 and 15 < abs(deviation_y) <= 50) or ( 30 < bottom_angle > 90)  :
             self.rotate_robot_tracking(self.bottom_angle)
             
         elif front_distance <= 17:
@@ -623,7 +638,7 @@ class Modes:
         elif front_distance > self.SAFE_DISTANCE and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
-                if (all(58 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
+                if (all(54 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
                     self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
                     sleep(0.5)
@@ -710,7 +725,7 @@ class Modes:
                     bottom_angle += step_angle
                 else:
                     bottom_angle = self.MIN_ANGLE
-                    top_angle -= 20  # Giảm góc của servo trên
+                    top_angle -= 30  # Giảm góc của servo trên
              
             self.search_object = False       
             self.is_tracking_warter = False

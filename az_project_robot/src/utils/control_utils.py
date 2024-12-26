@@ -55,7 +55,7 @@ def set_motors_direction(command, vx, vy, theta):
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, 0, 0, 0
     
     motor_controller = Motors()  # Khởi tạo đối tượng Motors
-    robot.balancing_velocity()
+    # robot.balancing_velocity()
     robot.backward_kinematics()  # Cập nhật giá trị động cơ dựa trên kinematics
 
     # Cập nhật tốc độ cho từng động cơ thông qua đối tượng motor_controller
@@ -119,22 +119,3 @@ def search_for_object(servo_1, servo_2, frame_queue, num_turns=4, step_angle=30,
 
     print("Không phát hiện được đối tượng trong vòng tìm kiếm.")
     return None, None  # Không tìm thấy đối tượng
-
-def rotate_robot(target_angle, vx, vy, DEFAULT_ANGLE, angle):
-    if target_angle < DEFAULT_ANGLE - angle:
-        set_motors_direction('rotate_right', vx, vy, 0)
-        sleep(0.1)
-        set_motors_direction('stop', vx, vy, 0)
-    elif target_angle > DEFAULT_ANGLE + angle:
-        set_motors_direction('rotate_left', vx, vy, 0)
-        sleep(0.1)
-        set_motors_direction('stop', vx, vy, 0)
-def go_right_or_left(target_angle, vx, vy, DEFAULT_ANGLE, angle):
-    if target_angle < DEFAULT_ANGLE - angle:
-        set_motors_direction('go_right', vx, vy, 0)
-        sleep(0.1)
-        set_motors_direction('stop', vx, vy, 0)
-    elif target_angle > DEFAULT_ANGLE + angle:
-        set_motors_direction('go_left', vx, vy, 0)
-        sleep(0.1)
-        set_motors_direction('stop', vx, vy, 0)

@@ -135,6 +135,11 @@
             align-items: center;
             margin-bottom: 15px;
         }
+        .center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -144,9 +149,10 @@
         <!-- Video Display -->
         <div class="video-container">
             <img src="/video_feed/object" alt="Color Detection Camera">
+            <!-- <img id = "line-image" src="http://127.0.0.1:5000/image/line-detect/Received_image.jpg" alt="Line detection" style="max-width: 100%; height: auto;"> -->
             <img src="/video_feed/color" alt="Object Detection Camera">
         </div>
-
+        
         <!-- Mode Switch -->
         <div class="mode-panel">
             <div class="mode-header">
@@ -162,12 +168,16 @@
             <!-- Auto Mode Settings -->
             <div class="auto-mode" id="auto-mode" style="display: none;">
                 <div class="status-panel">
-                    <span>Plants to Water:</span>
+                    <span>Number of plants to water:</span>
                     <input type="number" id="plant-count" value="0">
                 </div>
                 <div class="status-panel">
                     <span>Operation Time:</span>
                     <input type="time" id="operation-time">
+                </div>
+
+                <div class="control-panel center" >
+                    <button type="button" onclick="sendAutoCommand()">Confirm</button>
                 </div>
             </div>
             <!-- Manual Control Panel -->
@@ -248,6 +258,12 @@
     </div>
 
     <script>
+
+        setInterval(() => {
+                    const img = document.getElementById('line-image');
+                    img.src = img.src.split('?')[0] + '?' + new Date().getTime(); // Bypass caching
+                }, 100);
+
         function sendCommand(command) {
             fetch('/control', {
                 method: 'POST',
@@ -257,22 +273,38 @@
                 body: JSON.stringify({ command: command })
             }).catch(err => console.error('Failed to send command', err));
         }
+        // lay mode dieu khien xe
+        function getMode(){
+            document.getElementById('mode-switch').addEventListener('change', function(){
+                const isOn = this.checked;
+                const mode = isOn ? 'auto':'manual';
+                fetch('/mode', {
+                method: 'POST',
+                headers:{
+                    'content-Type': 'application/json'
+                },
+                body: JSON.stringify({ mode: mode})
+            }
+        ).catch(err => console.error('Failed to send mode', err));
+        })}
+            
         function updateStatus() {
             fetch('/status')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('battery-status').innerText = data.percentage.toFixed(1) + '%';
+                    document.getElementById('battery-status').innerText = data.battery.toFixed(1) + '%';
                     document.getElementById('voltage-status').innerText = data.voltage.toFixed(1) + 'V';
                     document.getElementById('current-status').innerText = data.current.toFixed(1) + 'mA';
                     document.getElementById('power-status').innerText = data.power.toFixed(1) + 'mW';
                     document.getElementById('remain-time-status').innerText = data.remaining_time.toFixed(1) +' hours';
                     document.getElementById('water-level-status').innerText = data.water;
-                    document.getElementById('wheel-speed').innerText = data.wheel_speed;
+                    document.getElementById('wheel-speed').innerText = data.wheel_speed.toFixed(2) + ' m/s';
                     document.getElementById('front-sensor').innerText = data.front_sensor.toFixed(1) +'cm';
                     document.getElementById('left-sensor').innerText = data.left_sensor.toFixed(1) +'cm';
                     document.getElementById('right-sensor').innerText = data.right_sensor.toFixed(1) +'cm';
                     document.getElementById('robot-direction').innerText = data.direction; 
                 }).catch(err => console.error('Failed to fetch status', err)); }
+
         function updateCurrentTime() {
             const now = new Date();
             const timeString = now.toLocaleTimeString();
@@ -285,6 +317,25 @@
             document.getElementById('manual-control').style.display = isAuto ? 'none' : 'grid';
             document.getElementById('current-mode').innerText = isAuto ? 'Auto' : 'Manual';
         }
+
+        function sendAutoCommand(){
+            let noPlant = document.getElementById('plant-count');
+            let opTime = document.getElementById('operation-time');
+            let value1 = noPlant.value;
+            let value2 = opTime.value;
+
+            fetch('/auto-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ value1, value2 }) // Sending separate keys
+            })
+            .then(response => response.json())
+            .then(data => console.log('Response:', data))
+            .catch(err => console.error('Failed to send command', err));
+            // alert("So cay can tuoi:" + value1 + "\nThoi gian hoat dong: " + value2)
+        }
     
         // Update status every 5 seconds
         setInterval(updateStatus, 5000);
@@ -294,5 +345,8 @@
     
         // Initialize mode
         toggleMode();
+        getMode();
+    
+        
     </script>
                 

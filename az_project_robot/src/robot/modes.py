@@ -56,6 +56,7 @@ class Modes:
         # Operational variables
         self.is_tracking_charger = False
         self.is_tracking_warter = False
+        self.is_docking = False
         self.is_resting = False  # Biến trạng thái nghỉ ngơi
         self.manual_mode = False
         self.is_watering = False
@@ -130,17 +131,17 @@ class Modes:
                 print("Exiting manual control.")
                 return
             elif command in ['+', '=']:
-                self.n = min(self.n + 1, 15)
+                self.n = min(self.n + 1, 10)
                 self.vx = self.n * self.speed
                 self.vy = self.n * self.speed
-                self.update_state(f"speed increased to {self.n * 15}%")
-                print(f"Tốc độ tăng lên {self.n * 15}%")
+                self.update_state(f"speed increased to {self.n * 10}%")
+                print(f"Tốc độ tăng lên {self.n * 10}%")
             elif command in ['-', '_']:
                 self.n = max(self.n - 1, 0)
                 self.vx = self.n * self.speed
                 self.vy = self.n * self.speed
-                self.update_state(f"speed decreased to {self.n * 15}%")
-                print(f"Tốc độ giảm xuống {self.n * 15}%")
+                self.update_state(f"speed decreased to {self.n * 10}%")
+                print(f"Tốc độ giảm xuống {self.n * 10}%")
             elif command in direction:
                 current_direction = direction[command]
                 print("Direction: " + current_direction)
@@ -148,13 +149,35 @@ class Modes:
                 self.update_state(f"moving {current_direction}")
             elif command == 'r':
                 self.relay_control.run_relay_for_duration()
-                self.update_state("watered activated")
+                self.update_state("watering activated")
             elif command in ['7', '8', '9', '0']:
                 self.control_servos(command)
             else:
                 self.update_state("invalid command")
                 print("Lệnh không hợp lệ. Vui lòng thử lại.")
-
+    def execute_command(self, command):
+        if command == 'w':
+            self.set_motors_direction('forward', self.vx, self.vy, self.theta)
+        elif command == 's':
+            self.set_motors_direction('backward', self.vx, self.vy, self.theta)
+        elif command == 'n':
+            self.set_motors_direction('stop', self.vx, self.vy, self.theta)
+        elif command == 'a':
+            self.set_motors_direction('left', self.vx, self.vy, self.theta)
+        elif command == 'd':
+            self.set_motors_direction('right', self.vx, self.vy, self.theta)
+        elif command == 'r':
+            self.relay_control.run_relay_for_duration()  # Kích hoạt tưới nước
+        elif command == '+':
+            self.n = min(self.n + 1, 15)  # Tăng tốc độ
+            self.vx = self.n * self.speed
+            self.vy = self.n * self.speed
+        elif command == '-':
+            self.n = max(self.n - 1, 0)  # Giảm tốc độ
+            self.vx = self.n * self.speed
+            self.vy = self.n * self.speed
+        else:
+            print("Lệnh không hợp lệ:", command)
     def control_servos(self, command):
         if command == '7':
             self.bottom_servo.move_up()
@@ -429,6 +452,7 @@ class Modes:
                             current_time, last_detection_time, search_interval, 
                             search_thread, front_left_distance, front_right_distance
                         )
+                        
                     sleep(0.05)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -456,7 +480,7 @@ class Modes:
                         current_time, last_detection_time, search_interval, search_thread,
                         front_left_distance, front_right_distance):
         """
-        Handles the mission of watered plants, including line following, plant detection, and obstacle avoidance.
+        Handles the mission of watering plants, including line following, plant detection, and obstacle avoidance.
         """
         # Xử lý theo đường màu vàng
         previous_state = self.current_state  # Lưu trạng thái hiện tại để so sánh sau
@@ -464,13 +488,12 @@ class Modes:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
         elif not status_yellow:
-            self.check_tracking_water(status_water)
             if status_water:  # Nếu phát hiện cây cần tưới
                 last_detection_time = current_time  # Cập nhật thời gian phát hiện
                 if search_thread and search_thread.is_alive():
                     self.stop_search_thread()  # Dừng luồng quét nếu đang chạy
                 self.move_to_target(deviation_x_water, deviation_y_water, front_distance)
-                self.current_state = "watered"
+                self.current_state = "watering"
 
             elif current_time - last_detection_time >= search_interval:  # Nếu đã đến thời gian quét lại
                 last_detection_time = current_time  # Cập nhật thời gian quét
@@ -484,23 +507,21 @@ class Modes:
                 last_detection_time = current_time
                 self.set_motors_direction("stop", self.vx, self.vy, 0)
                 self.current_state = "idle"
-
-            elif (self.bottom_angle != self.DEFAULT_ANGLE_BOTTOM and 
-                self.top_angle != self.DEFAULT_ANGLE_TOP and 
-                not self.is_tracking_warter and not self.search_object):
-                self.bottom_servo.move_to_angle(self.bottom_angle)
-                self.top_servo.move_to_angle(self.top_angle)
-            elif not self.search_object and not self.is_tracking_warter:
-                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
-                self.current_state = "move"
-            elif self.watered:
+            if self.watered:
                 if right_distance > left_distance:
                     self.rotate_robot('rotate_right')
                     self.update_direction("Xoay phải")
                 else:
                     self.rotate_robot('rotate_left')
                     self.update_direction("Xoay trái")
-                self.watered = False
+                self.current_state = "watered"
+            elif (self.bottom_angle != self.DEFAULT_ANGLE_BOTTOM and 
+                self.top_angle != self.DEFAULT_ANGLE_TOP and 
+                not self.is_tracking_warter and not self.search_object):
+                self.bottom_servo.move_to_angle(self.bottom_angle)
+                self.top_servo.move_to_angle(self.top_angle)
+            # else:
+            #     self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
         # So sánh trạng thái hiện tại với trạng thái trước đó
         if self.current_state != previous_state:
             print(f"Chuyển trạng thái từ {previous_state} sang {self.current_state}, đợi 1 giây...")
@@ -539,7 +560,7 @@ class Modes:
     def water_plants(self):
         self.update_state("Đang thực hiện tưới cây")
         self.relay_control.run_relay_for_duration()
-        print("Relay activated for watered...")
+        print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
         self.check_daily_mission()
         self.watered = True
@@ -636,8 +657,7 @@ class Modes:
             self.status_water_history.pop(0)  # Xóa trạng thái cũ nhất
 
         if all(not status for status in self.status_water_history):
-            self.reset_servo_to_default()
-            self.is_tracking_warter = False
+            self.is_tracking_warter = False  # Không theo dõi nữa
         else:
             self.is_tracking_warter = True
             

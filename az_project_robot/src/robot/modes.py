@@ -520,11 +520,14 @@ class Modes:
                 not self.is_tracking_warter and not self.search_object):
                 self.bottom_servo.move_to_angle(self.bottom_angle)
                 self.top_servo.move_to_angle(self.top_angle)
-            # else:
-            #     self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                self.current_state = "rotate servo"
+            elif self.current_state not in ["idle", "searching", "watering", "watered", "avoid_line"]:
+                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                self.current_state = "move"
         # So sánh trạng thái hiện tại với trạng thái trước đó
         if self.current_state != previous_state:
             print(f"Chuyển trạng thái từ {previous_state} sang {self.current_state}, đợi 1 giây...")
+            self.set_motors_direction("stop", self.vx, self.vy, 0)
             sleep(1)  # Thời gian chờ 1 giây
 
         return last_detection_time

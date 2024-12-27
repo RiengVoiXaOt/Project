@@ -60,7 +60,7 @@ class Modes:
         self.manual_mode = False
         self.is_watering = False
         self.is_at_charging_station = False
-        self.daily_mission = 3  # Số lượng cây cần tưới mỗi ngày
+        self.daily_mission = 1  # Số lượng cây cần tưới mỗi ngày
         self.current_mission_count = 0  # Đếm số cây đã tưới trong ngày
         self.mission = True  # Khởi tạo biến mission
         self.is_running = False
@@ -345,19 +345,11 @@ class Modes:
         self.start_video_stream()  # Khởi động luồng video
         color_thread = self.start_color_detection()  # Bắt đầu luồng nhận diện màu
         object_thread = self.start_object_detection()  # Bắt đầu luồng nhận diện đối tượng
-
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
         search_interval = 10  # Thời gian tìm kiếm lại (60 giây)
-        gg = datetime.now().time()
-        if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
-            or not (self.OPERATION_START_TIME <= gg <= self.OPERATION_END_TIME) 
-            or not self.mission):
-            self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
-            self.top_servo.move_to_angle(95)
-        else:
-            self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
-            self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
+        self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
+        self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
             
         print("Chế độ tự động đang chạy...")
         try:
@@ -499,6 +491,8 @@ class Modes:
     def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
                          status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger):
         
+        self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
+        self.top_servo.move_to_angle(95)
         if status_yellow and self.current_state != "following red line" and not self.is_tracking_charger:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
@@ -670,7 +664,6 @@ class Modes:
         # Kiểm tra nếu không có giá trị True trong 3 giá trị gần nhất
         if all(not status for status in self.status_charger_history):
             self.is_tracking_charger = False 
-            self.reset_servo_to_default()  # Reset servo nếu không có giá trị True
         else:
             self.is_tracking_charger = True
             

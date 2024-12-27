@@ -42,7 +42,7 @@ class Modes:
     MIN_ANGLE = 0
     DEFAULT_ANGLE_TOP = 70
     DEFAULT_ANGLE_BOTTOM = 60
-    LOW_BATTERY_THRESHOLD = 10
+    LOW_BATTERY_THRESHOLD = 1
     def __init__(self, n=None, theta=None):
         # Initialize hardware components
         
@@ -73,7 +73,7 @@ class Modes:
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
         self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
-        self.number_of_plant = 2
+        self.number_of_plant = 1
         
         self.check_event = Event()
         self.stop_event = Event()
@@ -572,25 +572,27 @@ class Modes:
         self.watered = True
         if right_distance > left_distance:
             self.rotate_robot('rotate_right')
+            sleep(1)
             self.update_direction("Xoay phải")
         else:
             self.rotate_robot('rotate_left')
+            sleep(1)
             self.update_direction("Xoay trái")
         self.reset_servo_to_default()
         self.watered = False
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 6:
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 5:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay phải điều chỉnh góc")
-            sleep(0.2)
+            sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
             sleep(0.1)
-        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 6:
+        elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 5:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay trái điều chỉnh góc")
-            sleep(0.2)
+            sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
             sleep(0.1)
             
@@ -636,22 +638,23 @@ class Modes:
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if (15 < abs(deviation_x) <= 50 and 15 < abs(deviation_y) <= 50) or ( 30 < bottom_angle > 90)  :
+        if (12 < abs(deviation_x) and 12 < abs(deviation_y)):
             self.rotate_robot_tracking(self.bottom_angle)
             
-        elif front_distance <= 17:
+        elif front_distance <= 15:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.water_plants(right_distance, left_distance)
             
-        elif front_distance > self.SAFE_DISTANCE and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
+        elif front_distance > 15 and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
                 if (all(54 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
                     self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
-                    sleep(0.5)
+                    sleep(0.3)
                     self.set_motors_direction('stop', self.vx, self.vy, 0)
+                    sleep(0.1)
                 
     ################################ ?????????????? ###############################
     def reset_servo_to_default(self):
@@ -706,7 +709,7 @@ class Modes:
         """Hàm quét tìm đối tượng."""
         self.update_state("Đang quét tìm kiếm đối tượng...")
         bottom_angle = start_angle
-        top_angle = 110
+        top_angle = 100
 
         while not self.stop_search_event.is_set():  # Kiểm tra nếu cần dừng tìm kiếm
             while top_angle >= 50:
@@ -730,12 +733,14 @@ class Modes:
                     bottom_angle += step_angle
                 else:
                     bottom_angle = self.MIN_ANGLE
-                    top_angle -= 30  # Giảm góc của servo trên
+                    top_angle -= 20  # Giảm góc của servo trên
              
             self.search_object = False       
             self.is_tracking_warter = False
             self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
+            self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
+            sleep(1)
             self.result_queue.put(None)  # Đẩy None vào hàng đợi khi không phát hiện được đối tượng
             
     def start_search_thread(self, start_angle, step_angle, number):

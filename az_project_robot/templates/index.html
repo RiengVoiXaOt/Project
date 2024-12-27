@@ -366,19 +366,16 @@
             })
             .then(response => {
                 if (response.ok) {
-                    // Bắt đầu hiển thị luồng video
+                    // Bắt đầu hiển thị luồng video sau khi lệnh tự động đã được gửi thành công
                     document.getElementById('color-video').src = '/video_feed/color'; // Đường dẫn đến luồng video phát hiện màu
                     document.getElementById('object-video').src = '/video_feed/object'; // Đường dẫn đến luồng video phát hiện đối tượng
-                }else {
+                } else {
                     throw new Error('Failed to send auto command');
                 }
             })
             .catch(err => console.error('Failed to send command', err));
-
         }
         
-        
-    
         // Update status every 5 seconds
         setInterval(updateStatus, 5000);
         setInterval(updateCurrentTime, 1000);

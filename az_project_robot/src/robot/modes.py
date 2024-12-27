@@ -40,9 +40,9 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 80
+    DEFAULT_ANGLE_TOP = 70
     DEFAULT_ANGLE_BOTTOM = 60
-    LOW_BATTERY_THRESHOLD = 25
+    LOW_BATTERY_THRESHOLD = 10
     def __init__(self, n=None, theta=None):
         # Initialize hardware components
         
@@ -69,6 +69,7 @@ class Modes:
         self.search_object = False
         self.firtstart = True
         self.watered = False
+        self.rotate_red = True
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
         self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
@@ -96,8 +97,8 @@ class Modes:
         self.servo_angle_history_bottom = []
         self.servo_angle_history_top = []
         self.last_activity_time = time()
-        self.OPERATION_START_TIME = datetime.strptime('14:00', '%H:%M').time()
-        self.OPERATION_END_TIME = datetime.strptime('15:00', '%H:%M').time()
+        self.OPERATION_START_TIME = datetime.strptime('0:00', '%H:%M').time()
+        self.OPERATION_END_TIME = datetime.strptime('3:00', '%H:%M').time()
         self.last_detection_time = time()
         self.set_motors_direction = set_motors_direction
         
@@ -322,7 +323,7 @@ class Modes:
                 elif deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
                     
-    def red_line_following(self, contours, front_distance):
+    def red_line_following(self, contours):
         if contours:
             self.update_state("Đang bám theo line đỏ")
             c = max(contours, key=cv2.contourArea)
@@ -348,10 +349,10 @@ class Modes:
 
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
-        search_interval = 12  # Thời gian tìm kiếm lại (60 giây)
-        now = datetime.now().time()
+        search_interval = 10  # Thời gian tìm kiếm lại (60 giây)
+        gg = datetime.now().time()
         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
-            or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
+            or not (self.OPERATION_START_TIME <= gg <= self.OPERATION_END_TIME) 
             or not self.mission):
             self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
             self.top_servo.move_to_angle(95)
@@ -508,7 +509,7 @@ class Modes:
                 self.rest_in_charger(front_distance, deviation_x_charger)
                 self.current_state = "resting"
             elif status_red and not self.is_tracking_charger:
-                self.red_line_following(contours_red, front_distance)
+                self.red_line_following(contours_red)
                 self.current_state = "following red line"  
             else:
                 if not self.is_tracking_charger:
@@ -585,11 +586,13 @@ class Modes:
             self.update_direction("Xoay phải điều chỉnh góc")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
+            sleep(0.1)
         elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 6:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay trái điều chỉnh góc")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
+            sleep(0.1)
             
     def move_to_target(self, deviation_x, deviation_y, front_distance, right_distance, left_distance):
         self.update_state("Đang tracking đối tượng")
@@ -614,7 +617,7 @@ class Modes:
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
         # Điều chỉnh góc servo trên
-        elif deviation_y <= -12:
+        if deviation_y <= -12:
             top_angle -= 1
             if top_angle <= self.MAX_ANGLE:
                 self.top_servo.move_to_angle(top_angle)
@@ -674,7 +677,6 @@ class Modes:
             self.status_water_history.pop(0)  # Xóa trạng thái cũ nhất
         if all(not status for status in self.status_water_history):
             self.is_tracking_warter = False  # Không theo dõi nữa
-            self.reset_servo_to_default()
         else:
             self.is_tracking_warter = True  
             

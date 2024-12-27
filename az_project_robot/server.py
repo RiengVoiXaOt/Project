@@ -11,7 +11,7 @@ robot = Modes()
 # # Khởi tạo tài nguyên cần thiết để cho color,object detection
 stop_event = robot.stop_search_event
 frame_q = robot.frame_queue
-videostream = robot.videostream
+#videostream = robot.videostream
 time.sleep(1)
 
 # Start the object and color detection threads
@@ -27,7 +27,6 @@ def gen_frames(mode):
                 output_frame = frame_data[1]  # Assuming frame_data[1] is the object frame
             else:
                 output_frame = None
-            
             if output_frame is not None:
                 _, buffer = cv2.imencode('.jpg', output_frame)
                 yield (b'--frame\r\n'
@@ -46,7 +45,41 @@ def video_feed_color_detection():
 def video_feed_object_detection():
     return Response(gen_frames("object"), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Route: Cập nhật trạng thái robot
+# Route: Lệnh chế độ tự động
+@app.route('/auto-command', methods=['POST'])
+def auto_command():
+    data = request.get_json()
+    robot.number_of_plant = int(data.get("value1", 0))
+    start_time = data.get("startTime")  # Nhận thời gian bắt đầu
+    end_time = data.get("endTime")      # Nhận thời gian kết thúc
+    
+    # Cập nhật thời gian hoạt động cho robot
+    robot.OPERATION_START_TIME = datetime.strptime(start_time, '%H:%M').time()
+    robot.OPERATION_END_TIME = datetime.strptime(end_time, '%H:%M').time()
+    
+    # Chuyển sang chế độ tự động
+    robot.switch_mode("automatic")
+    
+    # Start color and object detection threads
+    robot.start_video_stream()  # Khởi động luồng video
+    robot.start_color_detection()
+    robot.start_object_detection()
+
+    return jsonify({"success": True})
+
+# Route: Điều khiển chế độ (auto/manual)
+@app.route('/mode', methods=['POST'])
+def mode():
+    data = request.get_json()
+    mode = data.get("mode")
+    if mode == "manual":
+        robot.switch_mode("manual")
+        threading.Thread(target=robot.manual_control).start()
+    elif mode == "auto":
+        robot.switch_mode("automatic")
+        # Không khởi động tự động ngay tại đây
+    return jsonify({"success": True})
+
 @app.route('/status', methods=['GET'])
 def status():
     front = robot.ultrasonic_sensors.get_distance("front")
@@ -71,7 +104,6 @@ def status():
         "servo_down": servo_down,
         "servo_up": servo_up
     })
-
 
 # Route: Điều khiển robot (manual)
 @app.route('/control', methods=['POST'])
@@ -100,41 +132,6 @@ def manual_control_api():
             robot.update_state("watering activated")
         return jsonify({"status": "Command executed successfully", "current_state": command})
     return jsonify({"error": "Invalid command"}), 400
-
-# Route: Lệnh chế độ tự động
-@app.route('/auto-command', methods=['POST'])
-def auto_command():
-    data = request.get_json()
-    robot.number_of_plant = int(data.get("value1", 0))
-    start_time = data.get("startTime")  # Nhận thời gian bắt đầu
-    end_time = data.get("endTime")      # Nhận thời gian kết thúc
-    
-    # Cập nhật thời gian hoạt động cho robot
-    robot.OPERATION_START_TIME = datetime.strptime(start_time, '%H:%M').time()
-    robot.OPERATION_END_TIME = datetime.strptime(end_time, '%H:%M').time()
-    
-    # Chuyển sang chế độ tự động
-    robot.switch_mode("automatic")
-    
-    # Start color and object detection threads
-    robot.start_color_detection()
-    robot.start_object_detection()
-
-    return jsonify({"success": True})
-
-# Route: Điều khiển chế độ (auto/manual)
-@app.route('/mode', methods=['POST'])
-def mode():
-    data = request.get_json()
-    mode = data.get("mode")
-    if mode == "manual":
-        robot.switch_mode("manual")
-        threading.Thread(target=robot.manual_control).start()
-    elif mode == "auto":
-        robot.switch_mode("automatic")
-        # Không khởi động tự động ngay tại đây
-    return jsonify({"success": True})
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -70,8 +70,10 @@ class Modes:
         self.firtstart = True
         self.watered = False
         self.rotate_red = True
+        self.is_tracking_red_line = False
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
+        self.status_red_line_history = []
         self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
         
         self.check_event = Event()
@@ -314,13 +316,17 @@ class Modes:
             if left_distance > right_distance: 
                 if abs(deviation_x_yellow) < 150 or abs(deviation_y_yellow) < 150:
                     self.set_motors_direction('rotate_left', 0.15, 0.15, 0)
+                    self.update_direction("Xoay trái")
                 elif deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_left', 0.15, 0.15, 0)
+                    self.update_direction("Xoay trái")
             else:
                 if abs(deviation_x_yellow) < 150 or abs(deviation_y_yellow) < 150:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
+                    self.update_direction("Xoay phải")
                 elif deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
+                    self.update_direction("Xoay phải")
                     
     def red_line_following(self, contours):
         if contours:
@@ -332,12 +338,14 @@ class Modes:
                 cy = int(M['m01'] / M['m00'])
                 # Điều khiển robot dựa trên vị trí của đường đỏ
                 if cx < 100:  
-                    self.set_motors_direction('rotate_left', self.vx , self.vy, 0)              
+                    self.set_motors_direction('rotate_left', self.vx , self.vy, 0)
+                    self.update_direction("Xoay trái")              
                 elif cx > 300:  
                     self.set_motors_direction('rotate_right', self.vx , self.vy, 0)
+                    self.update_direction("Xoay trái")
                 else:  
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
-
+                    self.update_direction("Đi thẳng")
         
     ################################ Các hàm liên quan đến điều khiển tự động ################################
     def automatic_mode(self):
@@ -499,6 +507,7 @@ class Modes:
         # Khi không có đường màu vàng
         elif not status_yellow:
             self.check_tracking_charger(status_charger)
+            # self.check_tracking_red_line(status_red)
             if status_charger:
                 self.update_state("Đã phát hiện trạm sạc")
                 self.rest_in_charger(front_distance, deviation_x_charger)
@@ -506,6 +515,8 @@ class Modes:
             elif status_red and not self.is_tracking_charger:
                 self.red_line_following(contours_red)
                 self.current_state = "following red line"  
+            # elif not self.is_tracking_red_line and not self.is_tracking_charger:
+            #     self.set_motors_direction("rotate_right", self.vx, self.vy, 0)
             else:
                 if not self.is_tracking_charger:
                     self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
@@ -518,22 +529,24 @@ class Modes:
         self.update_state("Điều chỉnh vị trí cho việc tracking")
         if front_distance < 4.8:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
+            self.update_direction("Dừng")
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.update_state("Đang nghỉ ngơi tại trạm sạc")
             self.is_at_charging_station = True
         elif deviation_x_charger < -25:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
-            self.update_direction("Xoay phải điều chỉnh góc")
+            self.update_direction("Xoay phải")
             sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
         elif deviation_x_charger > 25:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
-            self.update_direction("Xoay trái điều chỉnh góc")
+            self.update_direction("Xoay trái")
             sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1) 
         elif front_distance >= 4.8 and abs(deviation_x_charger) < 25:
             self.update_state("Đã ổn định, robot bắt đầu di chuyển!")
             self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+            self.update_direction("Đi thẳng")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             sleep(0.1)
@@ -635,17 +648,19 @@ class Modes:
         if (12 < abs(deviation_x) and 12 < abs(deviation_y)):
             self.rotate_robot_tracking(self.bottom_angle)
             
-        elif front_distance <= 15:
+        elif front_distance <= 17:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
+            self.update_direction("Dừng")
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.water_plants(right_distance, left_distance)
             
-        elif front_distance > 15 and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
+        elif front_distance > 17 and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
                 if (all(54 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
                     self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+                    self.update_direction("Đi thẳng")
                     sleep(0.3)
                     self.set_motors_direction('stop', self.vx, self.vy, 0)
                     sleep(0.1)
@@ -675,6 +690,23 @@ class Modes:
             self.is_tracking_warter = False  # Không theo dõi nữa
         else:
             self.is_tracking_warter = True  
+    
+    def check_tracking_red_line(self, status_red):
+        """
+        Kiểm tra trạng thái theo dõi line đỏ dựa trên lịch sử trạng thái.
+        """
+        # Thêm trạng thái hiện tại vào mảng lịch sử
+        self.status_red_line_history.append(status_red)
+        # Giới hạn kích thước mảng lịch sử theo reset_threshold
+        if len(self.status_red_line_history) > self.reset_threshold:
+            self.status_red_line_history.pop(0)  # Xóa trạng thái cũ nhất
+        # Kiểm tra nếu tất cả trạng thái trong mảng gần đây đều là False
+        if all(not status for status in self.status_red_line_history):
+            print("Line đỏ bị mất! Kích hoạt chế độ tìm kiếm.")
+            self.is_tracking_red_line = False
+        else:
+            print("Đang theo dõi line đỏ.")
+            self.is_tracking_red_line = True
             
     ############################Kiểm tra thời gian nhiệm vụ ##############################
     

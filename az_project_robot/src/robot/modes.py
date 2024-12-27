@@ -40,7 +40,7 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 90
+    DEFAULT_ANGLE_TOP = 80
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 25
     def __init__(self, n=None, theta=None):
@@ -310,8 +310,6 @@ class Modes:
     ################################ Các hàm liên quan đến xử lý màu sắc ################################
     def handle_yellow_line(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance):
         if status_yellow:
-            self.top_servo.move_to_angle(110)
-            self.bottom_servo.move_to_angle(60)
             self.update_state("Tránh đường line vàng")
             if left_distance > right_distance: 
                 if abs(deviation_x_yellow) < 150 or abs(deviation_y_yellow) < 150:
@@ -344,8 +342,6 @@ class Modes:
     ################################ Các hàm liên quan đến điều khiển tự động ################################
     def automatic_mode(self):
         self.n = 2
-        self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
-        self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
         self.start_video_stream()  # Khởi động luồng video
         color_thread = self.start_color_detection()  # Bắt đầu luồng nhận diện màu
         object_thread = self.start_object_detection()  # Bắt đầu luồng nhận diện đối tượng
@@ -353,7 +349,16 @@ class Modes:
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
         search_interval = 12  # Thời gian tìm kiếm lại (60 giây)
-
+        now = datetime.now().time()
+        if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
+            or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
+            or not self.mission):
+            self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
+            self.top_servo.move_to_angle(95)
+        else:
+            self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
+            self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
+            
         print("Chế độ tự động đang chạy...")
         try:
             while not self.stop_event.is_set():  # Vòng lặp chính
@@ -396,6 +401,7 @@ class Modes:
                             cv2.imshow("object detection", frame_object)
                             cv2.waitKey(1)
                         self.check_station(status_charger, front_distance)
+                        
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
                             or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
@@ -491,7 +497,7 @@ class Modes:
     def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
                          status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger):
         
-        if status_yellow and self.current_state != "following red line" and not status_charger:
+        if status_yellow and self.current_state != "following red line" and not self.is_tracking_charger:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
         # Khi không có đường màu vàng
@@ -535,8 +541,6 @@ class Modes:
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             sleep(0.1)
-        if front_distance < 10:
-            self.top_servo.move_to_angle(100)
         self.top_angle = top_angle
         
     def leave_charger_station(self):
@@ -745,5 +749,5 @@ class Modes:
     ##################################gggggggggggggg######################################
     
     def check_station(self, status_charger, front_distance):
-        if status_charger and front_distance < 5:
+        if status_charger and front_distance < 6:
             self.is_at_charging_station = True

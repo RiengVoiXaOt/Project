@@ -4,36 +4,34 @@ import threading
 from src.utils.control_utils import getch, direction, set_motors_direction
 import time
 import cv2
+from datetime import datetime
+
 app = Flask(__name__)
 robot = Modes()
 # # Khởi tạo tài nguyên cần thiết để cho color,object detection
 stop_event = robot.stop_search_event
 frame_q = robot.frame_queue
 videostream = robot.videostream
-time.sleep(1)  
+time.sleep(1)
 
-print("-----------------------")
-print(frame_q)
-print("-----------------------")
-
-
+# Start the object and color detection threads
 object_thread = robot.start_object_detection()
 color_thread = robot.start_color_detection()
 def gen_frames(mode):
     while True:
-        if not frame_q.empty():  # Sửa frame_queue thành frame_q
-            frame, frame2 = frame_q.get()
+        if not frame_q.empty():
+            frame_data = frame_q.get()
             if mode == "color":
-                output_frame = frame  # Luồng Color Detection
+                output_frame = frame_data[0]  # Assuming frame_data[0] is the color frame
             elif mode == "object":
-                output_frame = frame2  # Luồng Object Detection
+                output_frame = frame_data[1]  # Assuming frame_data[1] is the object frame
             else:
                 output_frame = None
+            
             if output_frame is not None:
                 _, buffer = cv2.imencode('.jpg', output_frame)
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -43,6 +41,7 @@ def index():
 def video_feed_color_detection():
     return Response(gen_frames("color"), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# Route: Video feed for object detection
 @app.route('/video_feed/object')
 def video_feed_object_detection():
     return Response(gen_frames("object"), mimetype='multipart/x-mixed-replace; boundary=frame')

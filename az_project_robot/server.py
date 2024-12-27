@@ -14,9 +14,9 @@ def index():
 @app.route('/video_feed/<string:camera>')
 def video_feed(camera):
     if camera == "color":
-        return Response(generate_video(robot.videostream.color_stream), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(generate_video(robot.videostream.start_color_detection), mimetype='multipart/x-mixed-replace; boundary=frame')
     elif camera == "object":
-        return Response(generate_video(robot.videostream.object_stream), mimetype='multipart/x-mixed-replace; boundary=frame')
+        return Response(generate_video(robot.videostream.start_object_detection), mimetype='multipart/x-mixed-replace; boundary=frame')
     else:
         return "Invalid camera source", 400
 
@@ -41,7 +41,7 @@ def status():
         "power": battery_status[2],
         "battery": battery_status[3],
         "remaining_time": battery_status[4],
-        "water": robot.is_watering,
+        "water": "Có nước" if robot.is_watering else "Hết nước ",
         "wheel_speed": robot.vx,
         "front_sensor": sensor_data["front"],
         "left_sensor": sensor_data["left"],
@@ -67,7 +67,7 @@ def mode():
 def control():
     data = request.get_json()
     command = data.get("command")
-    robot.manual_control(command)
+    robot.manual_control()
     return jsonify({"success": True})
 
 # Route: Lệnh chế độ tự động

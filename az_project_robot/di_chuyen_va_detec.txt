@@ -36,8 +36,8 @@ b. Chế Độ Thủ Công
 """
 
 class Modes:
-    SAFE_DISTANCE = 20  # Khoảng cách an toàn (cm)
-    CRITICAL_DISTANCE = 15  # Ngưỡng cảnh báo (cm)
+    SAFE_DISTANCE = 30  # Khoảng cách an toàn (cm)
+    CRITICAL_DISTANCE = 20  # Ngưỡng cảnh báo (cm)
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
@@ -56,11 +56,12 @@ class Modes:
         # Operational variables
         self.is_tracking_charger = False
         self.is_tracking_warter = False
+        self.is_docking = False
         self.is_resting = False  # Biến trạng thái nghỉ ngơi
         self.manual_mode = False
         self.is_watering = False
         self.charge_station_found = False
-        self.daily_mission = 2  # Số lượng cây cần tưới mỗi ngày
+        self.daily_mission = 3  # Số lượng cây cần tưới mỗi ngày
         self.current_mission_count = 0  # Đếm số cây đã tưới trong ngày
         self.mission = True  # Khởi tạo biến mission
         self.is_running = False
@@ -69,10 +70,11 @@ class Modes:
         self.search_object = False
         self.firtstart = True
         self.watered = False
+        self.finding_angle = True
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
-        self.reset_threshold = 6  # Số lượng trạng thái cần kiểm tra
-        self.number_of_plant = 6
+        self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
+        self.number_of_plant = 2
         
         self.check_event = Event()
         self.stop_event = Event()
@@ -148,7 +150,7 @@ class Modes:
                 self.update_state(f"moving {current_direction}")
             elif command == 'r':
                 self.relay_control.run_relay_for_duration()
-                self.update_state("watered activated")
+                self.update_state("watering activated")
             elif command in ['7', '8', '9', '0']:
                 self.control_servos(command)
             else:
@@ -194,6 +196,7 @@ class Modes:
         self.update_state("stopped")
 
     def rotate_robot(self, direction, angle=90):
+        self.update_state("Tránh vật cản")
         max_rotate_time = angle / 90 * 3
         rotate_start_time = time()
 
@@ -216,14 +219,14 @@ class Modes:
 
         self.update_distance_history(front_distance, left_distance, right_distance,front_left_distance,front_right_distance)
 
-        f_state = front_distance < self.CRITICAL_DISTANCE
-        l_state = left_distance < self.CRITICAL_DISTANCE
+        f_state = front_distance < self.SAFE_DISTANCE
+        l_state = left_distance < self.SAFE_DISTANCE
         r_state = right_distance < self.SAFE_DISTANCE
         f_l_state = front_left_distance < self.SAFE_DISTANCE
         f_r_state = front_right_distance < self.SAFE_DISTANCE 
         
         if not f_state:
-            if not r_state and not l_state and not f_l_state and not f_r_state:
+            if left_distance > self.CRITICAL_DISTANCE and right_distance > self.CRITICAL_DISTANCE and not f_l_state and not f_r_state:
                 self.move_forward()
                 self.update_direction("Đang đi thẳng")
             if right_distance <= self.CRITICAL_DISTANCE:
@@ -232,12 +235,6 @@ class Modes:
             elif left_distance <= self.CRITICAL_DISTANCE:
                 self.set_motors_direction('go_right', self.vx, self.vy, 0)
                 self.update_direction("going right")
-            # elif front_left_distance < left_distance and front_left_distance < :
-            #     self.set_motors_direction('rotate_right', self.vx, self.vy, 0)
-            #     self.update_direction("rotate_right")
-            # elif front_right_distance < right_distance:
-            #     self.set_motors_direction('rotate_left', self.vx, self.vy, 0)
-            #     self.update_direction("rotate_left")
             elif front_left_distance <= self.SAFE_DISTANCE:
                 self.set_motors_direction('rotate_right', self.vx, self.vy, 0)
                 self.update_direction("rotate_right")
@@ -283,15 +280,13 @@ class Modes:
         self.stop_event.clear()
         object_thread = Thread(target=object_detection_loop, args=(self.videostream, self.stop_event, self.frame_queue), daemon=True)
         object_thread.start()
-        self.update_state("Bắt đầu luồng phát hiện đối tượng")
         return object_thread
         
     def start_color_detection(self):
         """Bắt đầu luồng phát hiện màu sắc."""
         self.stop_event.clear()
-        color_thread = Thread(target=color_detection_loop, args=(self.videostream, 320, 240, 1000, self.stop_event, self.frame_queue, 15), daemon=True)
+        color_thread = Thread(target=color_detection_loop, args=(self.videostream, 320, 240, 1000, self.stop_event, self.frame_queue, 10), daemon=True)
         color_thread.start()
-        self.update_state("Bắt đầu luồng phát hiện màu sắc")
         return color_thread
     
     def process_frame(self):
@@ -302,6 +297,7 @@ class Modes:
         """Khởi động VideoStream."""
         self.videostream.start()
         sleep(1)
+        
     def cv_show(self, frame, name="frame"):
         """Hiển thị khung hình bằng OpenCV."""
         cv2.imshow(name, frame)
@@ -316,11 +312,10 @@ class Modes:
             "deviation_x_water", "deviation_y_water", "deviation_x_charger", "deviation_y_charger", 
             "frame_object"
         ]
-        
         # Tạo từ điển từ dữ liệu
         frame_dict = dict(zip(keys, frame_data))
         return frame_dict
-
+        
     ################################ Các hàm liên quan đến xử lý màu sắc ################################
     def handle_yellow_line(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance):
         if status_yellow:
@@ -353,16 +348,8 @@ class Modes:
                     self.set_motors_direction('rotate_right', self.vx , self.vy, 0)
                 else:  
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
-    
-    def get_sensor_data(self):
-        """Lấy dữ liệu cảm biến."""
-        return {
-            "front": self.ultrasonic_sensors.get_distance("front"),
-            "left": self.ultrasonic_sensors.get_distance("left"),
-            "right": self.ultrasonic_sensors.get_distance("right"),
-            "front_left": self.ultrasonic_sensors.get_distance("front_left"),
-            "front_right": self.ultrasonic_sensors.get_distance("front_right")
-        }
+
+        
     ################################ Các hàm liên quan đến điều khiển tự động ################################
     def automatic_mode(self):
         self.n = 2
@@ -374,7 +361,7 @@ class Modes:
 
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
-        search_interval = 40  # Thời gian tìm kiếm lại (60 giây)
+        search_interval = 12  # Thời gian tìm kiếm lại (60 giây)
 
         print("Chế độ tự động đang chạy...")
         try:
@@ -382,6 +369,7 @@ class Modes:
                 self.daily_reset_check()
                 if not self.manual_mode:
                     current_time = time()
+                    now = datetime.now().time()
                     
                     # Xử lý khung hình từ hàng đợi
                     if not self.frame_queue.empty():
@@ -416,24 +404,41 @@ class Modes:
                         if frame_object is not None:
                             cv2.imshow("object detection", frame_object)
                             cv2.waitKey(1)
-                        
-                        print(front_distance)
-                        print(self.bottom_angle, self.top_angle)
-                        print(deviation_x_water, deviation_y_water)
-                        
-                        if self.check_battery_and_time():
-                            if self.mission:
-                                self.check_daily_mission()
-                                if self.is_resting:
-                                    self.left_charger()
-                                else:
-                                    last_detection_time = self.handle_water_mission(
-                                        status_yellow, deviation_x_yellow, deviation_y_yellow, 
-                                        left_distance, right_distance, status_water, 
-                                        deviation_x_water, deviation_y_water, front_distance, 
-                                        current_time, last_detection_time, search_interval, 
-                                        search_thread, front_left_distance, front_right_distance
-                                    )
+                            
+                        print(self.current_state)
+                        """
+                        Quản lý nhiệm vụ của robot dựa trên trạng thái pin, nhiệm vụ và vị trí.
+                        """
+                        # Điều kiện quay về trạm sạc
+                        if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
+                            or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
+                            or not self.mission):
+                            if self.is_at_charging_station:
+                                print("Robot đang ở trạm sạc. Tiếp tục chờ.")
+                            else:
+                                print("Pin thấp hoặc không có nhiệm vụ. Quay về trạm sạc...")
+                                self.return_to_charger_station(
+                                    status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
+                                    status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance
+                                )
+                                
+                        # Điều kiện thực hiện nhiệm vụ tưới cây
+                        elif (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
+                            and self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME 
+                            and self.mission):
+                            if self.is_at_charging_station:
+                                print("Pin đủ, có nhiệm vụ và trong thời gian hoạt động. Rời khỏi trạm sạc để thực hiện nhiệm vụ...")
+                                self.leave_charger_station()  # Rời khỏi trạm sạc nếu đang ở đó
+
+                            # Tiếp tục thực hiện nhiệm vụ tưới cây
+                            print("Đang thực hiện nhiệm vụ tưới cây...")
+                            last_detection_time = self.handle_water_mission(
+                                status_yellow, deviation_x_yellow, deviation_y_yellow, 
+                                left_distance, right_distance, status_water, 
+                                deviation_x_water, deviation_y_water, front_distance, 
+                                current_time, last_detection_time, search_interval, 
+                                search_thread, front_left_distance, front_right_distance
+                            )
                     sleep(0.05)
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -441,8 +446,8 @@ class Modes:
                         break
                 else:
                     self.update_state("Chuyển sang chế độ thủ công. Thoát khỏi tự động.")
+                    self.manual_mode=True
                     break  # Thoát khỏi vòng lặp nếu chuyển sang chế độ thủ công
-
             color_thread.join()
             object_thread.join()
 
@@ -454,91 +459,81 @@ class Modes:
             if 'videostream' in locals():
                 self.videostream.stop()  # Dừng video stream
             cv2.destroyAllWindows()  # Đóng tất cả cửa sổ OpenCV
-        pass
-    def return_charger(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
-                    status_water, deviation_x_water, deviation_y_water, front_distance,contours_red, status_red,
-                    status_charger, front_left_distance, front_right_distance):
-        if not self.is_resting:
-            self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
-            if not status_yellow:
-                self.red_line_following(contours_red)
-                if not status_red and not status_charger:
-                    self.avoid_and_navigate(front_distance, left_distance, right_distance,front_left_distance,front_right_distance)
-                if status_charger:
-                    set_motors_direction("stop", 0.1, 0.1, 0)
-                    sleep(0.05)
-                    if front_distance < 25 and status_charger:
-                        self.rest_in_charger(front_distance)
-        else:
-            self.rest_in_charger(front_distance)
-
+   #######################################Main############################################
     def handle_water_mission(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
-                        status_water, deviation_x_water, deviation_y_water, front_distance, 
-                        current_time, last_detection_time, search_interval, search_thread,
-                        front_left_distance, front_right_distance):
+                         status_water, deviation_x_water, deviation_y_water, front_distance, 
+                         current_time, last_detection_time, search_interval, search_thread,
+                         front_left_distance, front_right_distance):
         """
-        Handles the mission of watered plants, including line following, plant detection, and obstacle avoidance.
+        Handles the mission of watering plants, including line following, plant detection, and obstacle avoidance.
         """
-        # Xử lý theo đường màu vàng
-        previous_state = self.current_state  # Lưu trạng thái hiện tại để so sánh sau
-        if status_yellow and self.current_state != "idle":
+        # Xử lý khi phát hiện đường màu vàng
+        if status_yellow and not self.search_object and self.current_state != "watering":
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
-        elif not status_yellow:
+
+        # Khi không có đường màu vàng
+        elif not status_yellow: 
             self.check_tracking_water(status_water)
             if status_water:  # Nếu phát hiện cây cần tưới
-                last_detection_time = current_time  # Cập nhật thời gian phát hiện
+                last_detection_time = current_time
                 if search_thread and search_thread.is_alive():
-                    self.stop_search_thread()  # Dừng luồng quét nếu đang chạy
-                self.move_to_target(deviation_x_water, deviation_y_water, front_distance)
-                self.current_state = "watered"
+                    self.stop_search_thread()
+                self.move_to_target(deviation_x_water, deviation_y_water, front_distance, right_distance, left_distance)
+                last_detection_time = current_time
+                self.current_state = "watering"
 
-            elif current_time - last_detection_time >= search_interval:  # Nếu đã đến thời gian quét lại
-                last_detection_time = current_time  # Cập nhật thời gian quét
+            elif current_time - last_detection_time >= search_interval:  # Nếu đến thời gian quét
+                last_detection_time = current_time
                 if not search_thread or not search_thread.is_alive():
                     print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
                     self.search_object = True
                     self.start_search_thread(self.MIN_ANGLE, 2, 11)
                 self.current_state = "searching"
-            
-            if self.search_object:
+                
+            elif self.search_object and not self.is_tracking_warter:  # Khi đang tìm kiếm
                 last_detection_time = current_time
+                self.update_state("Dừng lại để quét đối tượng")
                 self.set_motors_direction("stop", self.vx, self.vy, 0)
                 self.current_state = "idle"
-
-            elif (self.bottom_angle != self.DEFAULT_ANGLE_BOTTOM and 
-                self.top_angle != self.DEFAULT_ANGLE_TOP and 
-                not self.is_tracking_warter and not self.search_object):
-                self.bottom_servo.move_to_angle(self.bottom_angle)
-                self.top_servo.move_to_angle(self.top_angle)
-            elif not self.search_object and not self.is_tracking_warter:
-                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
-                self.current_state = "move"
-            elif self.watered:
-                if right_distance > left_distance:
-                    self.rotate_robot('rotate_right')
-                    self.update_direction("Xoay phải")
-                else:
-                    self.rotate_robot('rotate_left')
-                    self.update_direction("Xoay trái")
-                self.watered = False
-        # So sánh trạng thái hiện tại với trạng thái trước đó
-        if self.current_state != previous_state:
-            print(f"Chuyển trạng thái từ {previous_state} sang {self.current_state}, đợi 1 giây...")
-            sleep(1)  # Thời gian chờ 1 giây
+            
+            else:  # Mặc định điều hướng tránh chướng ngại vật
+                if not self.is_tracking_warter:
+                    self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                    self.current_state = "move"
 
         return last_detection_time
     
+    def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
+                         status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance):
+        
+        if status_yellow:
+            self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
+            self.current_state = "avoid_line"
+        # Khi không có đường màu vàng
+        elif not status_yellow:
+            if status_charger:
+                self.rest_in_charger(front_distance)
+            elif status_red:
+                self.red_line_following(contours_red)
+                self.current_state = "following red line"  
+            else:
+                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                self.current_state = "move"
+         
     ################################ Charging station ###############################3
     def rest_in_charger(self, front_distance):
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
         if front_distance > 5:
-            self.set_motors_direction("go_forward",self.vx, self.vy, 0)
+            self.update_state("Di chuyển về phía trước để gần trạm sạc")
+            self.set_motors_direction("go_forward", self.vx, self.vy, 0)
+            sleep(0.1)
+            self.set_motors_direction("stop", self.vx, self.vy, 0)
         else:
             self.set_motors_direction("stop", self.vx, self.vy, 0)  # Dừng động cơ
-        self.update_direction("Dừng di chuyển")
-        self.update_state("Đang nghỉ ngơi tại trạm sạc")
-        self.is_resting = True
+            self.update_direction("Dừng di chuyển")
+            self.update_state("Đang nghỉ ngơi tại trạm sạc")
+            self.is_resting = True
         
     def left_charger(self):
         """Đi lùi và quay sang trái để vào trạm sạc."""
@@ -557,30 +552,39 @@ class Modes:
         sleep(1)
         self.is_resting = False
     #################################Object Tracking###########################################
-    def water_plants(self):
+    def water_plants(self, right_distance, left_distance):
         self.update_state("Đang thực hiện tưới cây")
         self.relay_control.run_relay_for_duration()
-        print("Relay activated for watered...")
+        print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
         self.check_daily_mission()
         self.watered = True
+        if right_distance > left_distance:
+            self.rotate_robot('rotate_right')
+            self.update_direction("Xoay phải")
+        else:
+            self.rotate_robot('rotate_left')
+            self.update_direction("Xoay trái")
+        self.reset_servo_to_default()
+        self.watered = False
         
     def rotate_robot_tracking(self, target_angle):
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 2:
+        if target_angle < self.DEFAULT_ANGLE_BOTTOM - 6:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
-            self.update_direction("Xoay phải")
+            self.update_direction("Xoay phải điều chỉnh góc")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
         elif target_angle > self.DEFAULT_ANGLE_BOTTOM + 6:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
-            self.update_direction("Xoay trái")
+            self.update_direction("Xoay trái điều chỉnh góc")
             sleep(0.2)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
             
-    def move_to_target(self, deviation_x, deviation_y, front_distance):
+    def move_to_target(self, deviation_x, deviation_y, front_distance, right_distance, left_distance):
         self.update_state("Đang tracking đối tượng")
         self.update_state("tracking")
+        print(deviation_x, deviation_y)
         bottom_angle = self.bottom_angle  # Sử dụng giá trị góc hiện tại của servo dưới
         top_angle = self.top_angle  # Sử dụng giá trị góc hiện tại của servo trên
 
@@ -619,18 +623,18 @@ class Modes:
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if 15 < abs(deviation_x) <= 50 and 15 < abs(deviation_y) <= 50  :
+        if (15 < abs(deviation_x) <= 50 and 15 < abs(deviation_y) <= 50) or ( 30 < bottom_angle > 90)  :
             self.rotate_robot_tracking(self.bottom_angle)
             
-        if front_distance <= 17:
+        elif front_distance <= 17:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             self.update_state("Xe đã tới gần vật, dừng lại.")
-            self.water_plants()
+            self.water_plants(right_distance, left_distance)
             
         elif front_distance > self.SAFE_DISTANCE and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
-                if (all(58 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
+                if (all(54 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
                     self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
                     sleep(0.5)
@@ -655,10 +659,8 @@ class Modes:
         self.status_water_history.append(status_water)
         if len(self.status_water_history) > self.reset_threshold:
             self.status_water_history.pop(0)  # Xóa trạng thái cũ nhất
-
         if all(not status for status in self.status_water_history):
-            self.reset_servo_to_default()
-            self.is_tracking_warter = False
+            self.is_tracking_warter = False  # Không theo dõi nữa
         else:
             self.is_tracking_warter = True
             
@@ -719,7 +721,7 @@ class Modes:
                     bottom_angle += step_angle
                 else:
                     bottom_angle = self.MIN_ANGLE
-                    top_angle -= 20  # Giảm góc của servo trên
+                    top_angle -= 30  # Giảm góc của servo trên
              
             self.search_object = False       
             self.is_tracking_warter = False

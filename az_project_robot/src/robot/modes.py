@@ -73,7 +73,6 @@ class Modes:
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
         self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
-        self.number_of_plant = 1
         
         self.check_event = Event()
         self.stop_event = Event()
@@ -398,10 +397,12 @@ class Modes:
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
                         
-                        if frame_object is not None:
-                            cv2.imshow("object detection", frame_object)
-                            cv2.waitKey(1)
+                        # if frame_object is not None:
+                        #     cv2.imshow("object detection", frame_object)
+                        #     cv2.waitKey(1)
+                        self.daily_reset_check()
                         self.check_station(status_charger, front_distance)
+                        self.check_daily_mission()
                         
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
@@ -568,7 +569,6 @@ class Modes:
         self.relay_control.run_relay_for_duration()
         print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
-        self.check_daily_mission()
         self.watered = True
         if right_distance > left_distance:
             self.rotate_robot('rotate_right')

@@ -41,7 +41,7 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 90
+    DEFAULT_ANGLE_TOP = 100
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 25
     def __init__(self, n=None, theta=None):
@@ -97,8 +97,8 @@ class Modes:
         self.servo_angle_history_bottom = []
         self.servo_angle_history_top = []
         self.last_activity_time = time()
-        self.OPERATION_START_TIME = datetime.strptime('08:00', '%H:%M').time()
-        self.OPERATION_END_TIME = datetime.strptime('09:00', '%H:%M').time()
+        self.OPERATION_START_TIME = datetime.strptime('14:00', '%H:%M').time()
+        self.OPERATION_END_TIME = datetime.strptime('15:00', '%H:%M').time()
         self.last_detection_time = time()
         self.set_motors_direction = set_motors_direction
         
@@ -390,8 +390,6 @@ class Modes:
                         deviation_x_yellow = frame_dict["deviation_x_yellow"]
                         deviation_y_yellow = frame_dict["deviation_y_yellow"]
                         status_charger = frame_dict["status_charger"]
-                        deviation_x_charger = frame_dict["deviation_x_charger"]
-                        deviation_y_charger = frame_dict["deviation_y_charger"]
                         deviation_x_water = frame_dict["deviation_x_water"]
                         deviation_y_water = frame_dict["deviation_y_water"]
                         status_water = frame_dict["status_water"]
@@ -422,8 +420,8 @@ class Modes:
                                     status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance
                                 )
                                 
-                        # Điều kiện thực hiện nhiệm vụ tưới cây
-                        elif (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
+                        # # Điều kiện thực hiện nhiệm vụ tưới cây
+                        if (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
                             and self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME 
                             and self.mission):
                             if self.is_at_charging_station:

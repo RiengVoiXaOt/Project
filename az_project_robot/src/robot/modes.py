@@ -6,7 +6,6 @@ from src.vision.color_detection import color_detection_loop
 from src.vision.object_detection import object_detection_loop
 from src.utils.control_utils import getch, direction, set_motors_direction
 from src.hardware.servos import ServoControl
-from src.utils.image_utils import load_labels, load_model, get_model_details, draw_detections, preprocess_frame, calculate_fps, analyze_detection
 from src.vision.video_stream import VideoStream
 from src.hardware.battery import BatteryMonitor
 from threading import Thread, Event, Lock
@@ -41,7 +40,7 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 100
+    DEFAULT_ANGLE_TOP = 90
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 25
     def __init__(self, n=None, theta=None):
@@ -122,7 +121,7 @@ class Modes:
 ################################ Các hàm liên quan đến điều khiển thủ công ################################
     def manual_control(self):
         while self.manual_mode:
-            print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, p to quit): ")
+            #print("Enter command (w/a/s/d/q/e/z/x/1/2/3 to move, r to toggle relay, p to quit): ")
             command = getch()
             if command == 'p':
                 self.top_servo.reset()
@@ -229,7 +228,7 @@ class Modes:
             if left_distance > self.CRITICAL_DISTANCE and right_distance > self.CRITICAL_DISTANCE and not f_l_state and not f_r_state:
                 self.move_forward()
                 self.update_direction("Đang đi thẳng")
-            if right_distance <= self.CRITICAL_DISTANCE:
+            elif right_distance <= self.CRITICAL_DISTANCE:
                 self.set_motors_direction('go_left', self.vx, self.vy, 0)
                 self.update_direction("going left")
             elif left_distance <= self.CRITICAL_DISTANCE:
@@ -317,18 +316,16 @@ class Modes:
             if left_distance > right_distance: 
                 if abs(deviation_x_yellow) < 150 or abs(deviation_y_yellow) < 150:
                     self.set_motors_direction('rotate_left', 0.15, 0.15, 0)
-                if deviation_y_yellow > 150 and deviation_x_yellow == 0:
+                elif deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_left', 0.15, 0.15, 0)
             else:
                 if abs(deviation_x_yellow) < 150 or abs(deviation_y_yellow) < 150:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
-                if deviation_y_yellow > 150 and deviation_x_yellow == 0:
+                elif deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
                     
     def red_line_following(self, contours, front_distance):
-        if front_distance < 20:
-            self.set_motors_direction('go_forward', self.vx/2, self.vy/2, 0)
-        elif contours:
+        if contours:
             self.update_state("Đang bám theo line đỏ")
             c = max(contours, key=cv2.contourArea)
             M = cv2.moments(c)
@@ -386,6 +383,8 @@ class Modes:
                         status_charger = frame_dict["status_charger"]
                         deviation_x_water = frame_dict["deviation_x_water"]
                         deviation_y_water = frame_dict["deviation_y_water"]
+                        deviation_x_charger = frame_dict["deviation_x_charger"]
+                        deviation_y_charger = frame_dict["deviation_y_charger"]
                         status_water = frame_dict["status_water"]
                         contours_red = frame_dict["contours_red"]
                         frame_object = frame_dict["frame_object"]
@@ -396,7 +395,7 @@ class Modes:
                         if frame_object is not None:
                             cv2.imshow("object detection", frame_object)
                             cv2.waitKey(1)
-                        
+                        self.check_station(status_charger, front_distance)
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
                             or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
@@ -407,8 +406,7 @@ class Modes:
                                 print("Pin thấp hoặc không có nhiệm vụ. Quay về trạm sạc...")
                                 self.return_to_charger_station(
                                     status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
-                                    status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance
-                                )
+                                    status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger)
                                 
                         # Điều kiện thực hiện nhiệm vụ tưới cây
                         elif (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
@@ -427,7 +425,6 @@ class Modes:
                                     current_time, last_detection_time, search_interval, 
                                     search_thread, front_left_distance, front_right_distance
                                 )
-
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.stop_event.set()
                         break
@@ -492,36 +489,55 @@ class Modes:
         return last_detection_time
     
     def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
-                         status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance):
+                         status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger):
         
         if status_yellow and self.current_state != "following red line" and not status_charger:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
         # Khi không có đường màu vàng
         elif not status_yellow:
+            self.check_tracking_charger(status_charger)
             if status_charger:
-                self.rest_in_charger(front_distance)
-                self.current_state = "resting" 
-            elif status_red:
-                self.red_line_following(contours_red)
+                self.update_state("Đã phát hiện trạm sạc")
+                self.rest_in_charger(front_distance, deviation_x_charger)
+                self.current_state = "resting"
+            elif status_red and not self.is_tracking_charger:
+                self.red_line_following(contours_red, front_distance)
                 self.current_state = "following red line"  
             else:
-                self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
-                self.current_state = "move"
+                if not self.is_tracking_charger:
+                    self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                    self.current_state = "move"
          
     ################################ Charging station ###############################3
-    def rest_in_charger(self, front_distance):
+    def rest_in_charger(self, front_distance, deviation_x_charger):
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
-        if front_distance > 4.8:
-            self.update_state("Di chuyển về phía trước để gần trạm sạc")
-            self.set_motors_direction("go_forward", self.vx, self.vy, 0)
-            sleep(0.1)
-            self.set_motors_direction("stop", self.vx, self.vy, 0)
-        else:
-            self.set_motors_direction("stop", self.vx, self.vy, 0)  # Dừng động cơ
-            self.update_direction("Dừng di chuyển")
+        top_angle = self.top_angle
+        self.update_state("Điều chỉnh vị trí cho việc tracking")
+        if front_distance < 4.8:
+            self.set_motors_direction('stop', self.vx, self.vy, 0)
+            self.update_state("Xe đã tới gần vật, dừng lại.")
             self.update_state("Đang nghỉ ngơi tại trạm sạc")
             self.is_at_charging_station = True
+        elif deviation_x_charger < -25:
+            self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
+            self.update_direction("Xoay phải điều chỉnh góc")
+            sleep(0.1)
+            self.set_motors_direction('stop', self.vx, self.vy, 1)
+        elif deviation_x_charger > 25:
+            self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
+            self.update_direction("Xoay trái điều chỉnh góc")
+            sleep(0.1)
+            self.set_motors_direction('stop', self.vx, self.vy, 1) 
+        elif front_distance >= 4.8 and abs(deviation_x_charger) < 25:
+            self.update_state("Đã ổn định, robot bắt đầu di chuyển!")
+            self.set_motors_direction('go_forward', self.vx, self.vy, 0)
+            sleep(0.2)
+            self.set_motors_direction('stop', self.vx, self.vy, 0)
+            sleep(0.1)
+        if front_distance < 10:
+            self.top_servo.move_to_angle(100)
+        self.top_angle = top_angle
         
     def leave_charger_station(self):
         """Đi lùi và quay sang trái để vào trạm sạc."""
@@ -539,6 +555,8 @@ class Modes:
             self.update_direction("Xoay phải")
         sleep(1)
         self.is_at_charging_station = False
+        self.reset_servo_to_default()
+        
     #################################Object Tracking###########################################
     def water_plants(self, right_distance, left_distance):
         self.update_state("Đang thực hiện tưới cây")
@@ -592,7 +610,7 @@ class Modes:
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
         # Điều chỉnh góc servo trên
-        if deviation_y <= -12:
+        elif deviation_y <= -12:
             top_angle -= 1
             if top_angle <= self.MAX_ANGLE:
                 self.top_servo.move_to_angle(top_angle)
@@ -641,7 +659,10 @@ class Modes:
             self.status_charger_history.pop(0)  # Xóa trạng thái cũ nhất
         # Kiểm tra nếu không có giá trị True trong 3 giá trị gần nhất
         if all(not status for status in self.status_charger_history):
-            self.reset_servo_to_default()  # Reset servo nếu không có giá trị True 
+            self.is_tracking_charger = False 
+            self.reset_servo_to_default()  # Reset servo nếu không có giá trị True
+        else:
+            self.is_tracking_charger = True
             
     def check_tracking_water(self, status_water):
         self.status_water_history.append(status_water)
@@ -649,8 +670,9 @@ class Modes:
             self.status_water_history.pop(0)  # Xóa trạng thái cũ nhất
         if all(not status for status in self.status_water_history):
             self.is_tracking_warter = False  # Không theo dõi nữa
+            self.reset_servo_to_default()
         else:
-            self.is_tracking_warter = True
+            self.is_tracking_warter = True  
             
     ############################Kiểm tra thời gian nhiệm vụ ##############################
     
@@ -721,3 +743,7 @@ class Modes:
         if self.search_thread and self.search_thread.is_alive():
             self.search_thread.join()  # Đợi luồng kết thúc
     ##################################gggggggggggggg######################################
+    
+    def check_station(self, status_charger, front_distance):
+        if status_charger and front_distance < 5:
+            self.is_at_charging_station = True

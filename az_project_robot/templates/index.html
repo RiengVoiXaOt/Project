@@ -147,10 +147,10 @@
 
     <div class="main-container">
         <!-- Video Display -->
+        
         <div class="video-container">
-            <img src="/video_feed/object" alt="Color Detection Camera">
-            <!-- <img id = "line-image" src="http://127.0.0.1:5000/image/line-detect/Received_image.jpg" alt="Line detection" style="max-width: 100%; height: auto;"> -->
-            <img src="/video_feed/color" alt="Object Detection Camera">
+            <img src="/video_feed/color" alt="Color Detection Camera" id="color-video">
+            <img src="/video_feed/object" alt="Object Detection Camera" id="object-video">
         </div>
         
         <!-- Mode Switch -->
@@ -172,11 +172,14 @@
                     <input type="number" id="plant-count" value="0">
                 </div>
                 <div class="status-panel">
-                    <span>Operation Time:</span>
-                    <input type="time" id="operation-time">
+                    <span>Start Time:</span>
+                    <input type="time" id="start-time">
                 </div>
-
-                <div class="control-panel center" >
+                <div class="status-panel">
+                    <span>End Time:</span>
+                    <input type="time" id="end-time">
+                </div>
+                <div class="control-panel center">
                     <button type="button" onclick="sendAutoCommand()">Confirm</button>
                 </div>
             </div>
@@ -238,23 +241,36 @@
                 <span>Wheel Speed:</span>
                 <span id="wheel-speed">Loading...</span>
             </div>
+
             <div class="status-panel">
-                <span>Front Sensor:</span>
-                <span id="front-sensor">Loading...</span>
+                <div>
+                    <span>Front Sensor:</span>
+                    <span id="front-sensor">Loading...</span>
+                </div>
+                <div>
+                    <span>Left Sensor:</span>
+                    <span id="left-sensor">Loading...</span>
+                </div>
+                <div >
+                    <span>Right Sensor:</span>
+                    <span id="right-sensor">Loading...</span>
+                </div>
             </div>
-            <div class="status-panel">
-                <span>Left Sensor:</span>
-                <span id="left-sensor">Loading...</span>
-            </div>
-            <div class="status-panel">
-                <span>Right Sensor:</span>
-                <span id="right-sensor">Loading...</span>
-            </div>
+
             <div class="status-panel">
                 <span>Direction:</span>
                 <span id="robot-direction">Loading...</span>
             </div>
-        </div>
+            <div class="status-panel">
+                <div>
+                    <span>Servo Top:</span>
+                    <span id="servo_up">Loading...</span>
+                </div>
+                <div>
+                    <span>Servo Down:</span>
+                    <span id="servo_down">Loading...</span>
+                </div>
+            </div>
     </div>
 
     <script>
@@ -303,6 +319,8 @@
                     document.getElementById('left-sensor').innerText = data.left_sensor.toFixed(1) +'cm';
                     document.getElementById('right-sensor').innerText = data.right_sensor.toFixed(1) +'cm';
                     document.getElementById('robot-direction').innerText = data.direction; 
+                    document.getElementById('servo_down').innerText = data.servo_down.toFixed(1) +'degree';
+                    document.getElementById('servo_up').innerText = data.servo_down.toFixed(1) +'degree'; 
                 }).catch(err => console.error('Failed to fetch status', err)); }
 
         function updateCurrentTime() {
@@ -318,27 +336,51 @@
             document.getElementById('current-mode').innerText = isAuto ? 'Auto' : 'Manual';
         }
 
-        function sendAutoCommand(){
+        function sendAutoCommand() {
             let noPlant = document.getElementById('plant-count');
-            let opTime = document.getElementById('operation-time');
+            let startTime = document.getElementById('start-time').value;
+            let endTime = document.getElementById('end-time').value;
             let value1 = noPlant.value;
-            let value2 = opTime.value;
-
-            fetch('/auto-command', {
+        
+            // Gửi lệnh để chuyển sang chế độ tự động
+            fetch('/mode', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ value1, value2 }) // Sending separate keys
+                body: JSON.stringify({ mode: 'auto' }) // Chuyển sang chế độ tự động
             })
-            .then(response => response.json())
-            .then(data => console.log('Response:', data))
+            .then(response => {
+                if (response.ok) {
+                    // Tiếp tục gửi số lượng cây và thời gian hoạt động
+                    return fetch('/auto-command', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ value1, startTime, endTime }) // Gửi số lượng cây và thời gian
+                    });
+                } else {
+                    throw new Error('Failed to switch to auto mode');
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Bắt đầu hiển thị luồng video
+                    document.getElementById('color-video').src = '/video_feed/color'; // Đường dẫn đến luồng video phát hiện màu
+                    document.getElementById('object-video').src = '/video_feed/object'; // Đường dẫn đến luồng video phát hiện đối tượng
+                }else {
+                    throw new Error('Failed to send auto command');
+                }
+            })
             .catch(err => console.error('Failed to send command', err));
-            // alert("So cay can tuoi:" + value1 + "\nThoi gian hoat dong: " + value2)
+
         }
+        
+        
     
         // Update status every 5 seconds
-        setInterval(updateStatus, 1000);
+        setInterval(updateStatus, 5000);
         setInterval(updateCurrentTime, 1000);
         updateStatus();
         updateCurrentTime();

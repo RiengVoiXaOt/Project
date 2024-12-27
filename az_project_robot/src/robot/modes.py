@@ -79,7 +79,7 @@ class Modes:
         self.stop_event = Event()
         self.frame_queue = Queue(maxsize=1)
         self.videostream = VideoStream(resolution=(640, 480), framerate=30)
-        self.result_queue = Queue(maxsize=3)  # Hàng đợi để lưu kết quả từ luồng quét
+        self.result_queue = Queue(maxsize=1)  # Hàng đợi để lưu kết quả từ luồng quét
         self.stop_search_event = Event()
         self.search_thread = None
 
@@ -289,19 +289,11 @@ class Modes:
         color_thread.start()
         return color_thread
     
-    def process_frame(self):
-        """Xử lý khung hình từ hàng đợi."""
-        return self.frame_queue.get()
-    
     def start_video_stream(self):
         """Khởi động VideoStream."""
         self.videostream.start()
         sleep(1)
         
-    def cv_show(self, frame, name="frame"):
-        """Hiển thị khung hình bằng OpenCV."""
-        cv2.imshow(name, frame)
-        cv2.waitKey(1)
     def process_frame(self):
         """Xử lý khung hình từ hàng đợi và trả về một từ điển chứa thông tin cần thiết."""
         frame_data = self.frame_queue.get()  # Lấy dữ liệu từ hàng đợi
@@ -333,8 +325,10 @@ class Modes:
                 if deviation_y_yellow > 150 and deviation_x_yellow == 0:
                     self.set_motors_direction('rotate_right', 0.15, 0.15, 0)
                     
-    def red_line_following(self, contours):
-        if contours:
+    def red_line_following(self, contours, front_distance):
+        if front_distance < 20:
+            self.set_motors_direction('go_forward', self.vx/2, self.vy/2, 0)
+        elif contours:
             self.update_state("Đang bám theo line đỏ")
             c = max(contours, key=cv2.contourArea)
             M = cv2.moments(c)
@@ -402,11 +396,7 @@ class Modes:
                         if frame_object is not None:
                             cv2.imshow("object detection", frame_object)
                             cv2.waitKey(1)
-                            
-                        print(self.current_state)
-                        """
-                        Quản lý nhiệm vụ của robot dựa trên trạng thái pin, nhiệm vụ và vị trí.
-                        """
+                        
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
                             or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
@@ -420,24 +410,23 @@ class Modes:
                                     status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance
                                 )
                                 
-                        # # Điều kiện thực hiện nhiệm vụ tưới cây
-                        if (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
+                        # Điều kiện thực hiện nhiệm vụ tưới cây
+                        elif (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
                             and self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME 
                             and self.mission):
                             if self.is_at_charging_station:
                                 print("Pin đủ, có nhiệm vụ và trong thời gian hoạt động. Rời khỏi trạm sạc để thực hiện nhiệm vụ...")
                                 self.leave_charger_station()  # Rời khỏi trạm sạc nếu đang ở đó
-
-                            # Tiếp tục thực hiện nhiệm vụ tưới cây
-                            print("Đang thực hiện nhiệm vụ tưới cây...")
-                            last_detection_time = self.handle_water_mission(
-                                status_yellow, deviation_x_yellow, deviation_y_yellow, 
-                                left_distance, right_distance, status_water, 
-                                deviation_x_water, deviation_y_water, front_distance, 
-                                current_time, last_detection_time, search_interval, 
-                                search_thread, front_left_distance, front_right_distance
-                            )
-                    sleep(0.05)
+                            else:
+                                # Tiếp tục thực hiện nhiệm vụ tưới cây
+                                print("Đang thực hiện nhiệm vụ tưới cây...")
+                                last_detection_time = self.handle_water_mission(
+                                    status_yellow, deviation_x_yellow, deviation_y_yellow, 
+                                    left_distance, right_distance, status_water, 
+                                    deviation_x_water, deviation_y_water, front_distance, 
+                                    current_time, last_detection_time, search_interval, 
+                                    search_thread, front_left_distance, front_right_distance
+                                )
 
                     if cv2.waitKey(1) & 0xFF == ord('q'):
                         self.stop_event.set()
@@ -523,7 +512,7 @@ class Modes:
     ################################ Charging station ###############################3
     def rest_in_charger(self, front_distance):
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
-        if front_distance > 5:
+        if front_distance > 4.8:
             self.update_state("Di chuyển về phía trước để gần trạm sạc")
             self.set_motors_direction("go_forward", self.vx, self.vy, 0)
             sleep(0.1)

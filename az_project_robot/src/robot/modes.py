@@ -40,7 +40,7 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 85
+    DEFAULT_ANGLE_TOP = 80
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 1
     def __init__(self, theta=None):
@@ -100,7 +100,7 @@ class Modes:
         self.servo_angle_history_top = []
         self.last_activity_time = time()
         self.OPERATION_START_TIME = datetime.strptime('17:00', '%H:%M').time()
-        self.OPERATION_END_TIME = datetime.strptime('19:00', '%H:%M').time()
+        self.OPERATION_END_TIME = datetime.strptime('22:00', '%H:%M').time()
         self.last_detection_time = time()
         self.set_motors_direction = set_motors_direction
         
@@ -379,8 +379,10 @@ class Modes:
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
         search_interval = 7  # Thời gian tìm kiếm lại (60 giây)
-        self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
-        self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
+        self.bottom_angle = 60
+        self.top_angle = 80
+        self.bottom_servo.move_to_angle(self.bottom_angle)
+        self.top_servo.move_to_angle(self.top_angle)
         self.speed_vx_vy()
         print("Chế độ tự động đang chạy...")
         try:
@@ -431,7 +433,7 @@ class Modes:
                             or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
                             or not self.mission):
                             self.bottom_angle = 60
-                            self.top_angle = 95
+                            self.top_angle = 100
                             self.bottom_servo.move_to_angle(60)
                             self.top_servo.move_to_angle(95)
                             if self.is_at_charging_station:
@@ -509,7 +511,8 @@ class Modes:
                     print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
                     self.search_object = True
                     self.start_search_thread(self.MIN_ANGLE, 1, 11)
-                self.current_state = "searching"
+                    self.current_state = "searching"
+                
                 
             elif self.search_object and not self.is_tracking_warter:  # Khi đang tìm kiếm
                 last_detection_time = current_time
@@ -600,6 +603,7 @@ class Modes:
     def water_plants(self, right_distance, left_distance):
         self.update_state("Đang thực hiện tưới cây")
         self.relay_control.run_relay_for_duration()
+        sleep(4)
         print("Relay activated for watering...")
         self.current_mission_count += 1  # Tăng số lượng cây đã tưới
         self.watered = True
@@ -790,7 +794,7 @@ class Modes:
             self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
-            sleep(2)
+            sleep(3)
             self.result_queue.put(None)  # Đẩy None vào hàng đợi khi không phát hiện được đối tượng
             
     def start_search_thread(self, start_angle, step_angle, number):

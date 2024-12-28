@@ -329,9 +329,10 @@
                     document.getElementById('robot-current-state').innerText = data.duty; 
                     document.getElementById('robot-state').innerText = data.state;  // Cập nhật trạng thái
                     document.getElementById('servo_down').innerText = data.servo_down.toFixed(1) +'degree';
-                    document.getElementById('servo_up').innerText = data.servo_down.toFixed(1) +'degree'; 
-                }).catch(err => console.error('Failed to fetch status', err)); }
-
+                    document.getElementById('servo_up').innerText = data.servo_up.toFixed(1) +'degree'; 
+                }).catch(err => console.error('Failed to fetch status', err)); 
+        }
+        
         function updateCurrentTime() {
             const now = new Date();
             const timeString = now.toLocaleTimeString();

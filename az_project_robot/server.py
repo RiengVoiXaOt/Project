@@ -8,15 +8,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 robot = Modes()
-# # Khởi tạo tài nguyên cần thiết để cho color,object detection
+# Khởi tạo tài nguyên cần thiết để cho color, object detection
 stop_event = robot.stop_search_event
 frame_q = robot.frame_queue
-#videostream = robot.videostream
 time.sleep(1)
 
-# Start the object and color detection threads
-object_thread = robot.start_object_detection()
-color_thread = robot.start_color_detection()
 def gen_frames(mode):   
     while True:
         if not frame_q.empty():
@@ -31,6 +27,7 @@ def gen_frames(mode):
                 _, buffer = cv2.imencode('.jpg', output_frame)
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -61,9 +58,9 @@ def auto_command():
     robot.switch_mode("automatic")
     
     # Start color and object detection threads
-    robot.start_video_stream()  # Khởi động luồng video
-    robot.start_color_detection()
-    robot.start_object_detection()
+    # robot.start_video_stream()  # Khởi động luồng video
+    # robot.start_color_detection()
+    # robot.start_object_detection()
     robot.automatic_mode()
     return jsonify({"success": True})
 
@@ -83,10 +80,10 @@ def mode():
 @app.route('/status', methods=['GET'])
 def status():
     front = robot.ultrasonic_sensors.get_distance("front")
-    left = robot.ultrasonic_sensors.get_distance( "left")
+    left = robot.ultrasonic_sensors.get_distance("left")
     right = robot.ultrasonic_sensors.get_distance("right")
     battery_status = robot.battery.read_battery_status()
-    servo_down =  robot.bottom_angle
+    servo_down = robot.bottom_angle
     servo_up = robot.top_angle
     
     return jsonify({
@@ -95,14 +92,14 @@ def status():
         "power": battery_status[2],
         "battery": battery_status[3],
         "remaining_time": battery_status[4],
-        "water": "Có nước" if robot.is_watering else "Hết nước ",
+        "water": "Có nước" if robot.is_watering else "Hết nước",
         "wheel_speed": robot.vx,
         "front_sensor": front,
         "left_sensor": left,
         "right_sensor": right,
-        "robot_direction": robot.current_state,
-        "duty" : robot.duty,
-        "state": robot.state,
+        "robot_direction": robot.direction,
+        "duty": robot.duty,  # Trạng thái hiện tại của robot
+        "state": robot.state,  # Hành động hiện tại của robot
         "servo_down": servo_down,
         "servo_up": servo_up
     })
@@ -114,7 +111,7 @@ def manual_control_api():
     command = data.get('command', None)
     if not command:
         return jsonify({"error": "No command provided"}), 400
-    if command in ['+', '=', '-', '_', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'x', 'r','p','1','2','3']: #, '7', '8', '9', '0'
+    if command in ['+', '=', '-', '_', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'x', 'r', 'p', '1', '2', '3']: 
         if command in ['+', '=']:
             robot.n = min(robot.n + 1, 10)
             robot.vx = robot.n * robot.speed
@@ -125,7 +122,7 @@ def manual_control_api():
             robot.vx = robot.n * robot.speed
             robot.vy = robot.n * robot.speed
             robot.update_state(f"speed decreased to {robot.n * 10}%")
-        elif command in direction :
+        elif command in direction:
             current_direction = direction[command]
             robot.set_motors_direction(current_direction, robot.vx, robot.vy, robot.theta)
             robot.update_state(f"moving {current_direction}")

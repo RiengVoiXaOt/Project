@@ -49,7 +49,7 @@ def video_feed_object_detection():
 @app.route('/auto-command', methods=['POST'])
 def auto_command():
     data = request.get_json()
-    robot.number_of_plant = int(data.get("value1", 0))
+    robot.daily_mission = int(data.get("value1", 0))
     start_time = data.get("startTime")  # Nhận thời gian bắt đầu
     end_time = data.get("endTime")      # Nhận thời gian kết thúc
     
@@ -100,7 +100,9 @@ def status():
         "front_sensor": front,
         "left_sensor": left,
         "right_sensor": right,
-        "robot_direction": robot.direction,
+        "robot_direction": robot.current_state,
+        "duty" : robot.duty,
+        "state": robot.state,
         "servo_down": servo_down,
         "servo_up": servo_up
     })

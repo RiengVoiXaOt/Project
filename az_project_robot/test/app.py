@@ -8,7 +8,6 @@ from datetime import datetime
 
 app = Flask(__name__)
 robot = Modes()
-print(robot.direction)
 #videostream = robot.videostream
 # Start the object and color detection threads
 # object_thread = robot.start_object_detection()
@@ -78,7 +77,7 @@ def status():
     right = robot.ultrasonic_sensors.get_distance("right")
     battery_status = robot.battery.read_battery_status()
     servo_down =  robot.bottom_angle
-    servo_up = robot.top_angle
+    servo_up = robot.top_angle  
     
     return jsonify({
         "voltage": battery_status[0],

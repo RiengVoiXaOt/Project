@@ -256,7 +256,14 @@
                     <span id="right-sensor">Loading...</span>
                 </div>
             </div>
-
+            <div class="status-panel">
+                <span>State:</span>
+                <span id="robot-state">Loading...</span>
+            </div>
+            <div class="status-panel">
+                <span>duty:</span>
+                <span id="robot-current-state">Loading...</span>
+            </div>
             <div class="status-panel">
                 <span>Direction:</span>
                 <span id="robot-direction">Loading...</span>
@@ -318,7 +325,9 @@
                     document.getElementById('front-sensor').innerText = data.front_sensor.toFixed(1) +'cm';
                     document.getElementById('left-sensor').innerText = data.left_sensor.toFixed(1) +'cm';
                     document.getElementById('right-sensor').innerText = data.right_sensor.toFixed(1) +'cm';
-                    document.getElementById('robot-direction').innerText = data.direction; 
+                    document.getElementById('robot-direction').innerText = data.robot_direction; 
+                    document.getElementById('robot-current-state').innerText = data.duty; 
+                    document.getElementById('robot-state').innerText = data.state;  // Cập nhật trạng thái
                     document.getElementById('servo_down').innerText = data.servo_down.toFixed(1) +'degree';
                     document.getElementById('servo_up').innerText = data.servo_down.toFixed(1) +'degree'; 
                 }).catch(err => console.error('Failed to fetch status', err)); }

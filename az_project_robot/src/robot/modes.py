@@ -40,10 +40,10 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 70
+    DEFAULT_ANGLE_TOP = 85
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 1
-    def __init__(self, n=None, theta=None):
+    def __init__(self, theta=None):
         # Initialize hardware components
         
         self.relay_control = RelayControl(5)
@@ -74,7 +74,7 @@ class Modes:
         self.status_charger_history = []  # Mảng để lưu trữ trạng thái
         self.status_water_history = []  # Mảng để lưu trữ trạng thái
         self.status_red_line_history = []
-        self.reset_threshold = 7  # Số lượng trạng thái cần kiểm tra
+        self.reset_threshold = 10  # Số lượng trạng thái cần kiểm tra
         
         self.check_event = Event()
         self.stop_event = Event()
@@ -85,7 +85,7 @@ class Modes:
         self.search_thread = None
 
         # Default settings
-        self.n = n if n is not None else 2
+        self.n = 2
         self.theta = theta if theta is not None else 0
         self.speed = 0.04309596457
         self.vx = self.n * self.speed
@@ -94,12 +94,13 @@ class Modes:
         self.direction = "stoped"
         self.active_mode = "automatic"
         self.current_state = "None"
+        self.duty = "None"
         self.distance_history = { "front": [], "left": [], "right": [], "front_left": [], "front_right": []}
         self.servo_angle_history_bottom = []
         self.servo_angle_history_top = []
         self.last_activity_time = time()
-        self.OPERATION_START_TIME = datetime.strptime('0:00', '%H:%M').time()
-        self.OPERATION_END_TIME = datetime.strptime('3:00', '%H:%M').time()
+        self.OPERATION_START_TIME = datetime.strptime('17:00', '%H:%M').time()
+        self.OPERATION_END_TIME = datetime.strptime('19:00', '%H:%M').time()
         self.last_detection_time = time()
         self.set_motors_direction = set_motors_direction
         
@@ -114,12 +115,35 @@ class Modes:
         if activate_mode == 'automatic':
             self.active_mode = 'automatic'
             self.manual_mode = False
-        else:
+            print("Chuyển sang chế độ tự động.")
+        elif activate_mode == 'manual':
             self.active_mode = 'manual'
             self.manual_mode = True
-    def start(self):
-        self.check_event.clear()
-        Thread(target=self.automatic_mode).start()
+            self.set_motors_direction("stop", self.vx, self.vy, 0)
+            print("Chuyển sang chế độ thủ công.")
+            # Tắt camera và các luồng hoạt động
+            self.stop_event.set()  # Kích hoạt sự kiện dừng
+            self.stop_threads_and_camera()
+            
+    def stop_threads_and_camera(self):
+        # Tắt video stream
+        if hasattr(self, 'videostream') and self.videostream:
+            self.videostream.stop()
+            print("Đã tắt camera.")
+        # Tắt tất cả các threads đang chạy
+        if hasattr(self, 'color_thread') and self.color_thread.is_alive():
+            self.color_thread.join(timeout=1)
+            print("Đã dừng luồng nhận diện màu.")
+        if hasattr(self, 'object_thread') and self.object_thread.is_alive():
+            self.object_thread.join(timeout=1)
+            print("Đã dừng luồng nhận diện đối tượng.")
+        # Tắt các threads tìm kiếm nếu có
+        if hasattr(self, 'search_thread') and self.search_thread and self.search_thread.is_alive():
+            self.search_thread.join(timeout=1)
+            print("Đã dừng luồng tìm kiếm.")
+        # Đóng cửa sổ OpenCV nếu có
+        cv2.destroyAllWindows()
+        print("Đã đóng tất cả cửa sổ OpenCV.")
 ################################ Các hàm liên quan đến điều khiển thủ công ################################
     def manual_control(self):
         while self.manual_mode:
@@ -349,16 +373,15 @@ class Modes:
         
     ################################ Các hàm liên quan đến điều khiển tự động ################################
     def automatic_mode(self):
-        self.n = 2
         self.start_video_stream()  # Khởi động luồng video
         color_thread = self.start_color_detection()  # Bắt đầu luồng nhận diện màu
         object_thread = self.start_object_detection()  # Bắt đầu luồng nhận diện đối tượng
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
-        search_interval = 10  # Thời gian tìm kiếm lại (60 giây)
+        search_interval = 7  # Thời gian tìm kiếm lại (60 giây)
         self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
         self.top_servo.move_to_angle(self.DEFAULT_ANGLE_TOP)
-            
+        self.speed_vx_vy()
         print("Chế độ tự động đang chạy...")
         try:
             while not self.stop_event.is_set():  # Vòng lặp chính
@@ -397,21 +420,24 @@ class Modes:
                         mask_yellow = frame_dict["mask_yellow"]
                         frame_color = frame_dict["frame_color"]
                         
-                        # if frame_object is not None:
-                        #     cv2.imshow("object detection", frame_object)
-                        #     cv2.waitKey(1)
                         self.daily_reset_check()
-                        self.check_station(status_charger, front_distance)
+                        # self.check_station(status_charger, front_distance)
                         self.check_daily_mission()
+                        print(self.top_angle, self.bottom_angle)
+                        print(self.n)
                         
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
                             or not (self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME) 
                             or not self.mission):
+                            self.bottom_angle = 60
+                            self.top_angle = 95
+                            self.bottom_servo.move_to_angle(60)
+                            self.top_servo.move_to_angle(95)
                             if self.is_at_charging_station:
-                                print("Robot đang ở trạm sạc. Tiếp tục chờ.")
+                                self.duty = "Robot đang ở trạm sạc. Tiếp tục chờ."
                             else:
-                                print("Pin thấp hoặc không có nhiệm vụ. Quay về trạm sạc...")
+                                self.duty = "Pin thấp hoặc không có nhiệm vụ. Quay về trạm sạc..."
                                 self.return_to_charger_station(
                                     status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
                                     status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger)
@@ -420,12 +446,13 @@ class Modes:
                         elif (self.battery.read_battery_status()[3] >= self.LOW_BATTERY_THRESHOLD 
                             and self.OPERATION_START_TIME <= now <= self.OPERATION_END_TIME 
                             and self.mission):
-                            if self.is_at_charging_station:
-                                print("Pin đủ, có nhiệm vụ và trong thời gian hoạt động. Rời khỏi trạm sạc để thực hiện nhiệm vụ...")
+                            self.check_tracking_charger(status_charger)
+                            if self.is_at_charging_station and front_distance < 5:
+                                self.duty = "Pin đủ, có nhiệm vụ và trong thời gian hoạt động. Rời khỏi trạm sạc để thực hiện nhiệm vụ..."
                                 self.leave_charger_station()  # Rời khỏi trạm sạc nếu đang ở đó
                             else:
                                 # Tiếp tục thực hiện nhiệm vụ tưới cây
-                                print("Đang thực hiện nhiệm vụ tưới cây...")
+                                self.duty = "Đang thực hiện nhiệm vụ tưới cây..."
                                 last_detection_time = self.handle_water_mission(
                                     status_yellow, deviation_x_yellow, deviation_y_yellow, 
                                     left_distance, right_distance, status_water, 
@@ -460,7 +487,8 @@ class Modes:
         Handles the mission of watering plants, including line following, plant detection, and obstacle avoidance.
         """
         # Xử lý khi phát hiện đường màu vàng
-        if status_yellow and not self.search_object and self.current_state != "watering":
+        
+        if status_yellow and not self.search_object and self.current_state != "watering" and not self.is_tracking_warter:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
 
@@ -480,7 +508,7 @@ class Modes:
                 if not search_thread or not search_thread.is_alive():
                     print("Không phát hiện cây cần tưới. Bắt đầu quét lại...")
                     self.search_object = True
-                    self.start_search_thread(self.MIN_ANGLE, 2, 11)
+                    self.start_search_thread(self.MIN_ANGLE, 1, 11)
                 self.current_state = "searching"
                 
             elif self.search_object and not self.is_tracking_warter:  # Khi đang tìm kiếm
@@ -499,8 +527,6 @@ class Modes:
     def return_to_charger_station(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
                          status_charger, status_red, contours_red, front_distance, front_left_distance, front_right_distance, deviation_x_charger):
         
-        self.bottom_servo.move_to_angle(self.DEFAULT_ANGLE_BOTTOM)
-        self.top_servo.move_to_angle(95)
         if status_yellow and self.current_state != "following red line" and not self.is_tracking_charger:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
@@ -527,7 +553,7 @@ class Modes:
         """Đưa robot vào trạng thái nghỉ ngơi tại trạm sạc."""
         top_angle = self.top_angle
         self.update_state("Điều chỉnh vị trí cho việc tracking")
-        if front_distance < 4.8:
+        if front_distance < 4.7:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             self.update_direction("Dừng")
             self.update_state("Xe đã tới gần vật, dừng lại.")
@@ -543,7 +569,7 @@ class Modes:
             self.update_direction("Xoay trái")
             sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1) 
-        elif front_distance >= 4.8 and abs(deviation_x_charger) < 25:
+        elif front_distance >= 4.7 and abs(deviation_x_charger) < 25:
             self.update_state("Đã ổn định, robot bắt đầu di chuyển!")
             self.set_motors_direction('go_forward', self.vx, self.vy, 0)
             self.update_direction("Đi thẳng")
@@ -648,13 +674,13 @@ class Modes:
         if (12 < abs(deviation_x) and 12 < abs(deviation_y)):
             self.rotate_robot_tracking(self.bottom_angle)
             
-        elif front_distance <= 17:
+        elif front_distance <= 18:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             self.update_direction("Dừng")
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.water_plants(right_distance, left_distance)
             
-        elif front_distance > 17 and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
+        elif front_distance > 18 and abs(deviation_x) <= 12 and abs(deviation_y) <= 12:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
                 if (all(54 <= angle <= 66 for angle in last_three_angles)) or (bottom_angle < 75 and abs(deviation_x) <= 10 and abs(deviation_y) <= 10):
@@ -734,14 +760,13 @@ class Modes:
         """Hàm quét tìm đối tượng."""
         self.update_state("Đang quét tìm kiếm đối tượng...")
         bottom_angle = start_angle
-        top_angle = 100
+        top_angle = 90
 
         while not self.stop_search_event.is_set():  # Kiểm tra nếu cần dừng tìm kiếm
             while top_angle >= 50:
                 self.bottom_servo.move_to_angle(bottom_angle)
                 self.top_servo.move_to_angle(top_angle)
-                sleep(0.1)  # Giảm thời gian chờ
-
+                sleep(0.02)
                 if not self.frame_queue.empty():
                     frame_data = self.frame_queue.get()
                     status = frame_data[number]
@@ -765,7 +790,7 @@ class Modes:
             self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
-            sleep(1)
+            sleep(2)
             self.result_queue.put(None)  # Đẩy None vào hàng đợi khi không phát hiện được đối tượng
             
     def start_search_thread(self, start_angle, step_angle, number):
@@ -780,6 +805,12 @@ class Modes:
             self.search_thread.join()  # Đợi luồng kết thúc
     ##################################gggggggggggggg######################################
     
-    def check_station(self, status_charger, front_distance):
-        if status_charger and front_distance < 6:
-            self.is_at_charging_station = True
+    # def check_station(self, status_charger, front_distance):
+    #     if status_charger and front_distance < 6:
+    #         self.is_at_charging_station = True
+    #     else: 
+    #         self.is_at_charging_station = False
+    def speed_vx_vy(self):
+        self.n = 2
+        self.vx = self.n * self.speed
+        self.vy = self.n * self.speed

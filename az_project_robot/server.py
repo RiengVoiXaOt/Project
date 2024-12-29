@@ -9,9 +9,9 @@ from datetime import datetime
 app = Flask(__name__)
 robot = Modes()
 # Khởi tạo tài nguyên cần thiết để cho color, object detection
-stop_event = robot.stop_search_event
+#stop_event = robot.stop_search_event
 frame_q = robot.frame_queue
-time.sleep(1)
+#time.sleep(1)
 
 def gen_frames(mode):   
     while True:
@@ -71,7 +71,7 @@ def mode():
     mode = data.get("mode")
     if mode == "manual":
         robot.switch_mode("manual")
-        threading.Thread(target=robot.manual_control).start()
+        #threading.Thread(target=robot.manual_control).start()
     elif mode == "auto":
         robot.switch_mode("automatic")
         # Không khởi động tự động ngay tại đây

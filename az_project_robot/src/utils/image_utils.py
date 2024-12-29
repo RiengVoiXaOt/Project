@@ -25,9 +25,13 @@ def process_frame(frame):
     mask_red = mask1_red + mask2_red    
 
     # Mask for yellow (adjusted for bright yellow only)
-    lower_yellow = np.array([25, 150, 150])
-    upper_yellow = np.array([35, 255, 255])
-    mask_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    lower_yellow = np.array([15, 100, 100])  # Reduced S and V values for lighter shades
+    upper_yellow = np.array([30, 255, 255])
+    mask1_yellow = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    lower_yellow2 = np.array([30, 100, 100])
+    upper_yellow2 = np.array([40, 255, 255])
+    mask2_yellow = cv2.inRange(hsv, lower_yellow2, upper_yellow2)
+    mask_yellow = mask1_yellow + mask2_yellow
 
     return mask_red, mask_yellow
 

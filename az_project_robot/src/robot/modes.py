@@ -40,7 +40,7 @@ class Modes:
     MAX_HISTORY = 15  # Giới hạn lịch sử khoảng cách    
     MAX_ANGLE = 120
     MIN_ANGLE = 0
-    DEFAULT_ANGLE_TOP = 80
+    DEFAULT_ANGLE_TOP = 60
     DEFAULT_ANGLE_BOTTOM = 60
     LOW_BATTERY_THRESHOLD = 1
     def __init__(self, theta=None):
@@ -379,10 +379,6 @@ class Modes:
         search_thread = None  # Biến để theo dõi luồng tìm kiếm
         last_detection_time = time()  # Thời gian phát hiện vật cuối cùng
         search_interval = 7  # Thời gian tìm kiếm lại (60 giây)
-        self.bottom_angle = 60  # Góc ban đầu của servo dưới
-        self.top_angle = 80  # Góc ban đầu của servo trên
-        self.bottom_servo.move_to_angle(self.bottom_angle)
-        self.top_servo.move_to_angle(self.top_angle)
         self.speed_vx_vy()
         print("Chế độ tự động đang chạy...")
         try:
@@ -423,11 +419,10 @@ class Modes:
                         frame_color = frame_dict["frame_color"]
                         
                         self.daily_reset_check()
-                        # self.check_station(status_charger, front_distance)
                         self.check_daily_mission()
                         print(self.top_angle, self.bottom_angle)
-                        # if frame_object is not None:
-                        #     cv2.imshow("Black Mask", frame_object)
+                        if frame_object is not None:
+                            cv2.imshow("Black Mask", frame_object)
                         
                         # Điều kiện quay về trạm sạc
                         if (self.battery.read_battery_status()[3] < self.LOW_BATTERY_THRESHOLD 
@@ -452,7 +447,7 @@ class Modes:
                             else:
                                 # Tiếp tục thực hiện nhiệm vụ tưới cây
                                 self.duty = "Đang thực hiện nhiệm vụ tưới cây..."
-                                last_detection_time = self.handle_water_mission(
+                        last_detection_time = self.handle_water_mission(
                                     status_yellow, deviation_x_yellow, deviation_y_yellow, 
                                     left_distance, right_distance, status_water, 
                                     deviation_x_water, deviation_y_water, front_distance, 
@@ -486,7 +481,6 @@ class Modes:
         Handles the mission of watering plants, including line following, plant detection, and obstacle avoidance.
         """
         # Xử lý khi phát hiện đường màu vàng
-        
         if status_yellow and not self.search_object and self.current_state != "watering" and not self.is_tracking_warter:
             self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance)
             self.current_state = "avoid_line"
@@ -509,7 +503,6 @@ class Modes:
                     self.start_search_thread(self.MIN_ANGLE, 1, 11)
                     self.current_state = "searching"
                 
-                
             elif self.search_object and not self.is_tracking_warter:  # Khi đang tìm kiếm
                 last_detection_time = current_time
                 self.update_state("Dừng lại để quét đối tượng")
@@ -519,6 +512,7 @@ class Modes:
             else:  # Mặc định điều hướng tránh chướng ngại vật
                 if not self.is_tracking_warter:
                     self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
+                    self.reset_servo_to_default()
                     self.current_state = "move"
 
         return last_detection_time
@@ -540,8 +534,6 @@ class Modes:
             elif status_red and not self.is_tracking_charger:
                 self.red_line_following(contours_red)
                 self.current_state = "following red line"  
-            # elif not self.is_tracking_red_line and not self.is_tracking_charger:
-            #     self.set_motors_direction("rotate_right", self.vx, self.vy, 0)
             else:
                 if not self.is_tracking_charger:
                     self.avoid_and_navigate(front_distance, left_distance, right_distance, front_left_distance, front_right_distance)
@@ -558,17 +550,17 @@ class Modes:
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.update_state("Đang nghỉ ngơi tại trạm sạc")
             self.is_at_charging_station = True
-        elif deviation_x_charger < -25:
+        elif deviation_x_charger < -30:
             self.set_motors_direction('rotate_left', self.vx, self.vy, 1)
             self.update_direction("Xoay phải")
             sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1)
-        elif deviation_x_charger > 25:
+        elif deviation_x_charger > 30:
             self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
             self.update_direction("Xoay trái")
             sleep(0.1)
             self.set_motors_direction('stop', self.vx, self.vy, 1) 
-        elif front_distance >= 4.7 and abs(deviation_x_charger) < 25:
+        elif front_distance >= 4.7 and abs(deviation_x_charger) < 30:
             self.update_state("Đã ổn định, robot bắt đầu di chuyển!")
             self.set_motors_direction('go_forward', self.vx, self.vy, 0)
             self.update_direction("Đi thẳng")
@@ -637,53 +629,54 @@ class Modes:
         top_angle = self.top_angle  # Sử dụng giá trị góc hiện tại của servo trên
 
         # Điều chỉnh góc servo dưới
-        if deviation_x <= -20:
+        if deviation_x <= -30:
             bottom_angle += 1
             if bottom_angle <= self.MAX_ANGLE:
                 self.bottom_servo.move_to_angle(bottom_angle)
                 self.servo_angle_history_bottom.append(bottom_angle)
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
-        elif deviation_x >= 20:
+        elif deviation_x >= 30:
             bottom_angle -= 1
             if bottom_angle >= self.MIN_ANGLE:
                 self.bottom_servo.move_to_angle(bottom_angle)
                 self.servo_angle_history_bottom.append(bottom_angle)
                 if len(self.servo_angle_history_bottom) > self.MAX_HISTORY:
                     self.servo_angle_history_bottom.pop(0)
+        bottom_angle = max(self.MIN_ANGLE, min(bottom_angle, self.MAX_ANGLE))
         # Điều chỉnh góc servo trên
-        if deviation_y <= -20:
+        if deviation_y <= -30:
             top_angle -= 1
             if top_angle <= self.MAX_ANGLE:
                 self.top_servo.move_to_angle(top_angle)
                 self.servo_angle_history_top.append(top_angle)
                 if len(self.servo_angle_history_top) > self.MAX_HISTORY:
                     self.servo_angle_history_top.pop(0)
-        elif deviation_y >= 20:
+        elif deviation_y >= 30:
             top_angle += 1
             if top_angle >= self.MIN_ANGLE:
                 self.top_servo.move_to_angle(top_angle)
                 self.servo_angle_history_top.append(top_angle)
                 if len(self.servo_angle_history_top) > self.MAX_HISTORY:
                     self.servo_angle_history_top.pop(0)
-
+        top_angle = max(self.MIN_ANGLE, min(top_angle, self.MAX_ANGLE))
         # Lưu lại góc hiện tại sau khi điều chỉnh
         self.bottom_angle = bottom_angle
         self.top_angle = top_angle
 
-        if (abs(deviation_x) <= 20 and abs(deviation_y) <= 20 and bottom_angle and not (54 < bottom_angle < 66)) or (90 > bottom_angle < 30):
+        if (abs(deviation_x) <= 30 and abs(deviation_y) <= 30 and bottom_angle and not (52 < bottom_angle < 68)) or (90 > bottom_angle < 30):
             self.rotate_robot_tracking(self.bottom_angle)
             
-        elif front_distance <= 17:
+        elif front_distance <= 20:
             self.set_motors_direction('stop', self.vx, self.vy, 0)
             self.update_direction("Dừng")
             self.update_state("Xe đã tới gần vật, dừng lại.")
             self.water_plants(right_distance, left_distance)
             
-        elif front_distance > 17 and abs(deviation_x) <= 20 and abs(deviation_y) <= 20:
+        elif front_distance > 20 and abs(deviation_x) <= 30 and abs(deviation_y) <= 30:
             if len(self.servo_angle_history_bottom) >= 3:
                 last_three_angles = self.servo_angle_history_bottom[-3:]
-                if (all(54 < angle < 66 for angle in last_three_angles)):
+                if (all(52 < angle < 68 for angle in last_three_angles)):
                     self.update_state("Servo 1 ổn định, robot bắt đầu di chuyển!")
                     self.set_motors_direction('go_forward', self.vx, self.vy, 0)
                     self.update_direction("Đi thẳng")
@@ -790,8 +783,6 @@ class Modes:
             self.is_tracking_warter = False
             self.reset_servo_to_default()
             self.update_state("Không phát hiện được đối tượng.")
-            self.set_motors_direction('rotate_right', self.vx, self.vy, 1)
-            sleep(3)
             self.result_queue.put(None)  # Đẩy None vào hàng đợi khi không phát hiện được đối tượng
             
     def start_search_thread(self, start_angle, step_angle, number):

@@ -1,16 +1,41 @@
-    #Tìm đường về trạm sạc
-def return_charger(self, status_yellow, deviation_x_yellow, deviation_y_yellow, left_distance, right_distance,
-                    status_water, deviation_x_water, deviation_y_water, front_distance,)
-    if not self.is_resting:
-        self.handle_yellow_line(status_yellow, deviation_x_yellow, deviation_y_yellow)
-        if not status_yellow:
-            self.red_line_following(contours_red)
-            if not status_red and not status_charger:
-                self.avoid_and_navigate(front_distance, left_distance, right_distance,front_left_distance,front_right_distance)
-            if status_charger:
-                set_motors_direction("stop", 0.1, 0.1, 0)
-                sleep(0.05)
-                if front_distance < 25 and status_charger:
-                    self.rest_in_charger(front_distance)
-    else:
-        self.rest_in_charger(front_distance)
+def find_red_line():
+    while True:
+        move_zigzag()
+        if detect_red_line():
+            return True
+    return False
+def move_zigzag():
+    move_forward()
+    adjust_left()
+    move_forward()
+    adjust_right()
+    move_forward()
+    adjust_left()
+    move_forward()
+    adjust_right()
+def follow_red_line():
+    while True:
+        position = detect_line_position()
+        if position == "CENTER":
+            move_forward()
+        elif position == "LEFT":
+            adjust_left()
+        elif position == "RIGHT":
+            adjust_right()
+        else:  # Line lost
+            stop()
+            return "LINE_LOST"
+
+        if detect_station_label():  # Check if reached station
+            stop()
+            return "STATION_FOUND"
+
+def search_and_follow_line():
+    while True:
+        if find_red_line():
+            result = follow_red_line()
+            if result == "STATION_FOUND":
+                break
+            elif result == "LINE_LOST":  # Line lost, retry zigzag search
+                rotate_180()
+                continue

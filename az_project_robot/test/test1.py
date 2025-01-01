@@ -1,111 +1,77 @@
-from robot.modes import RobotModes
-from vision.video_stream import VideoStream
-from vision.color_detection import color_detection_loop
-from vision.object_detection import object_detection_loop
-from threading import Event, Thread
-from queue import Queue
 import cv2
+import numpy as np
 
-def main():
-    robot_modes = RobotModes()
+# Initialize the webcam
+camera = cv2.VideoCapture(0)
+camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
-    while True:
-        command = input("Enter 'm' for manual, 'a' for automatic, or 'q' to quit: ")
-        if command == "m":
-            robot_modes.switch_mode()
-            robot_modes.manual_control()
-        elif command == "a":
-            robot_modes.switch_mode()
-            robot_modes.automatic_mode()
-        elif command == "q":
-            break
+if not camera.isOpened():
+    print("Error: Could not open the webcam.")
+    exit()
 
-if __name__ == "__main__":
-    main()
+while True:
+    # Capture a frame from the webcam
+    ret, frame = camera.read()
+    if not ret:
+        print("Error: Could not read a frame from the webcam.")
+        break
 
+    # Convert the frame to HSV for color detection
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
+    # Define the red color range (adjust as necessary for lighting conditions)
+    lower_red1 = np.array([0, 120, 70])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([170, 120, 70])
+    upper_red2 = np.array([180, 255, 255])
 
-def control_rule_auto(robot, vx, vy, theta, a_n, delta):
-    front_distance, left_distance, right_distance, f_state, l_state, r_state = sensor_distance()
-    
-    if a_n == 0:  # Chế độ tự động
-        print("--------------------------------")
-        print(f"Tốc độ hiện tại: {current_speed}")
-        print("Tự động chạy")
-        print(f"Cảm biến trước {f_state}, Cảm biến trái {l_state}, Cảm biến phải {r_state}")
-        print(f"Cảm biến trước {front_distance}, Cảm biến trái {left_distance}, Cảm biến phải {right_distance}")
+    # Create a mask for red color
+    red_mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    red_mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    red_mask = red_mask1 | red_mask2
 
-        # Nếu không có vật cản phía trước
-        if f_state == 0:
-            front_distance_history.clear()
-            left_distance_history.clear()
-            right_distance_history.clear()
-            
-            if l_state == 0 and r_state == 0:
-                action = 'go_forward'
-                action_msg = "đi thẳng"
-            elif r_state == 1 and right_distance < 15:
-                action = 'go_left'
-                action_msg = "đi trái"
-            elif l_state == 1 and left_distance < 15:
-                action = 'go_right'
-                action_msg = "đi phải"
-            elif l_state == 1:
-                action = 'diagonal_up_right'
-                action_msg = "Đi chéo lên phải"
-            elif r_state == 1:
-                action = 'diagonal_up_left'
-                action_msg = "Đi chéo lên trái"
-            else:
-                action = 'stop'
-                action_msg = "dừng lại"
+    # Clean up the mask with morphological operations
+    #kernel = np.ones((3, 3), np.uint8)
+    #red_mask = cv2.erode(red_mask, kernel, iterations=5)
+    #red_mask = cv2.dilate(red_mask, kernel, iterations=9)
 
-            set_motors_direction(robot, action, vx, vy, theta)
-            print(action_msg)
+    # Find contours of the red line
+    contours, _ = cv2.findContours(red_mask.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-        else:  # Có vật cản phía trước
-            # Lưu giá trị cảm biến
-            if not front_distance_history and not right_distance_history and not left_distance_history:
-                front_distance_history.append(min(front_distance, 85) if front_distance < 100 else 85)
-                left_distance_history.append(min(left_distance, 85) if left_distance < 100 else 85)
-                right_distance_history.append(min(right_distance, 85) if right_distance < 100 else 85)
+    if len(contours) > 0:
+        # Get the largest contour (assumed to be the red line)
+        largest_contour = max(contours, key=cv2.contourArea)
+        blackbox = cv2.minAreaRect(largest_contour)
+        (x_min, y_min), (w_min, h_min), ang = blackbox
 
-            # Nếu quá gần vật cản phía trước
-            if front_distance <= 12:
-                action = 'go_backward'
-                action_msg = "đi lùi khi quá gần vật cản phía trước"
-            elif l_state == 0 and r_state == 0 and front_distance >= 10:
-                action, action_msg = rotate_based_on_side(robot, vx, vy, theta, right_distance, left_distance)
-            elif l_state == 1 and r_state == 0 and front_distance >= 10:
-                action = 'rotate_right'
-                action_msg = "xoay phải"
-            elif l_state == 0 and r_state == 1 and front_distance >= 10:
-                action = 'rotate_left'
-                action_msg = "xoay trái"
-            elif l_state == 1 and r_state == 1 and front_distance >= 10:
-                action, action_msg = rotate_based_on_side(robot, vx, vy, theta, right_distance, left_distance)
+        # Calculate the angle and error
+        if ang < -45:
+            ang = 90 + ang
+        if w_min < h_min and ang > 0:
+            ang = (90 - ang) * -1
+        if w_min > h_min and ang < 0:
+            ang = 90 + ang
 
-            if action:
-                set_motors_direction(robot, action, vx, vy, theta)
-                print(action_msg)
+        setpoint = 320  # Horizontal center of the frame
+        error = int(x_min - setpoint)
+        ang = int(ang)
 
-def rotate_based_on_side(robot, vx, vy, theta, right_distance, left_distance):
-    """Xoay robot dựa trên khoảng cách bên trái và bên phải."""
-    if right_distance > left_distance:  # Xoay phải
-        while True:
-            front_distance, left_distance, right_distance, f_state, l_state, r_state = sensor_distance()
-            set_motors_direction(robot, 'rotate_right', vx, vy, theta)
-            if front_distance >= right_distance_history[0] - delta:
-                set_motors_direction(robot, 'stop', vx, vy, theta)
-                sleep(0.3)
-                break
-        return 'rotate_right', "xoay phải"
-    else:  # Xoay trái
-        while True:
-            front_distance, left_distance, right_distance, f_state, l_state, r_state = sensor_distance()
-            set_motors_direction(robot, 'rotate_left', vx, vy, theta)
-            if front_distance >= left_distance_history[0] - delta:
-                set_motors_direction(robot, 'stop', vx, vy, theta)
-                sleep(0.3)
-                break
-        return 'rotate_left', "xoay trái"
+        # Draw the bounding box and display the angle and error
+        box = cv2.boxPoints(blackbox)
+        box = np.intp(box)
+        cv2.drawContours(frame, [box], 0, (0, 0, 255), 3)
+        cv2.putText(frame, f"Angle: {ang}", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        cv2.putText(frame, f"Error: {error}", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        cv2.line(frame, (int(x_min), 200), (int(x_min), 250), (255, 0, 0), 3)
+
+    # Display the frame
+    cv2.imshow("Red Line Tracking", frame)
+
+    # Exit the loop when 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release resources
+camera.release()
+cv2.destroyAllWindows()

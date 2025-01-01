@@ -30,29 +30,27 @@ def getch():
 
 def set_motors_direction(command, vx, vy, theta):
     if command == 'go_forward':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, theta, 0
     elif command == 'go_backward':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, 0, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, 0, theta, 0
     elif command == 'go_left':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, vy, theta, 0
     elif command == 'go_right':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, -vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, -vy, theta, 0
     elif command == 'diagonal_up_left':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, vy, theta, 0
     elif command == 'diagonal_down_left':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, vy, theta, 0
     elif command == 'diagonal_up_right':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, -vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, -vy, theta, 0
     elif command == 'diagonal_down_right':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, -vy, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, -vy, theta, 0
     elif command == 'stop':
         robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, 0, 0, 0
     elif command == 'rotate_left':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, 0, 0, 1
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = -vx, 0, theta, 1
     elif command == 'rotate_right':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, 0, 1
-    elif command =='stop':
-        robot.vxg, robot.vyg, robot.theta_d, robot.turn = 0, 0, 0, 0
+        robot.vxg, robot.vyg, robot.theta_d, robot.turn = vx, 0, theta, 1
     
     motor_controller = Motors()  # Khởi tạo đối tượng Motors
     # robot.balancing_velocity()

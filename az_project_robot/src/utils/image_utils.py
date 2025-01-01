@@ -16,13 +16,15 @@ def process_frame(frame):
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # Mask màu đỏ
-    lower_red = np.array([0, 120, 70])
-    upper_red = np.array([10, 255, 255])
-    mask1_red = cv2.inRange(hsv, lower_red, upper_red)
-    lower_red2 = np.array([170, 120, 70])
-    upper_red2 = np.array([180, 255, 255])
+    lower_red1 = np.array([0, 100, 50])  # Giảm S và V để bao quát màu tối hơn
+    upper_red1 = np.array([10, 255, 255])  # Giữ nguyên mức trên
+
+    lower_red2 = np.array([170, 100, 50])  # Giảm S và V
+    upper_red2 = np.array([180, 255, 255])  # Giữ nguyên mức trên
+
+    mask1_red = cv2.inRange(hsv, lower_red1, upper_red1)
     mask2_red = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask_red = mask1_red + mask2_red    
+    mask_red = mask1_red + mask2_red 
 
     # Mask for yellow (adjusted for bright yellow only)
     lower_yellow = np.array([15, 100, 100])  # Reduced S and V values for lighter shades
@@ -32,8 +34,17 @@ def process_frame(frame):
     upper_yellow2 = np.array([40, 255, 255])
     mask2_yellow = cv2.inRange(hsv, lower_yellow2, upper_yellow2)
     mask_yellow = mask1_yellow + mask2_yellow
+    
+    # Mask for blue
+    lower_blue = np.array([100, 100, 100])  # Lower range for blue
+    upper_blue = np.array([120, 255, 255])  # Upper range for blue
+    mask1_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+    lower_blue2 = np.array([120, 100, 100])  # Adjusted for cyan-like blue shades
+    upper_blue2 = np.array([130, 255, 255])
+    mask2_blue = cv2.inRange(hsv, lower_blue2, upper_blue2)
+    mask_blue = mask1_blue + mask2_blue
 
-    return mask_red, mask_yellow
+    return mask_red, mask_yellow, mask_blue
 
 
 # Phân tích contour của đối tượng

@@ -117,4 +117,4 @@ def object_detection_loop(videostream, stop_event, frame_queue):
         cv2.putText(frame, f'FPS: {frame_rate_calc:.2f}', (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2, cv2.LINE_AA)
 
         if not frame_queue.full():
-            frame_queue.put((None,None,None,None,None,None,None,None,None,None, None,status_water, status_charger, deviation_x_water,deviation_y_water, deviation_x_charger, deviation_y_charger, frame))
+            frame_queue.put((None,None,None,None,None,None,None,None,None,None, None,None, status_water, status_charger, deviation_x_water,deviation_y_water, deviation_x_charger, deviation_y_charger, frame))

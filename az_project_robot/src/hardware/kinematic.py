@@ -24,7 +24,7 @@ class Kinematic:
         self.v1 = self.v2 = self.v3 = self.v4 = 0
         self.vxg = x
         self.vyg = y
-        self.theta_d = d
+        self.theta_d = d * np.pi/180
         self.max_speed_rpm = 60  # Tốc độ tối đa của động cơ (rpm)
         self.max_speed_rad_per_s = self.max_speed_rpm * 2 * np.pi / 60
         # Ma trận cấu hình động học

@@ -86,7 +86,7 @@ def color_detection_loop(videostream, center_x, center_y, min_box_area, stop_eve
 
         mask_red, mask_yellow, mask_blue = process_frame(frame)
         status_red, x_r, y_r, contours_red, x_red, y_red, w_red, h_red = analyze_contours(mask_red, center_x, center_y, min_box_area, "red")
-        status_yellow, x_b, y_b, contours_yellow, x_yellow, y_yellow, w_yellow, h_yellow = analyze_contours(mask_yellow, center_x, center_y, min_box_area, "yellow")
+        status_yellow, x_y, y_y, contours_yellow, x_yellow, y_yellow, w_yellow, h_yellow = analyze_contours(mask_yellow, center_x, center_y, min_box_area, "yellow")
         status_blue, x_b, y_b, contours_blue, x_blue, y_blue, w_blue, h_blue = analyze_contours(mask_blue, center_x, center_y, min_box_area, "blue")
 
         # Gửi kết quả vào hàng đợi
@@ -96,7 +96,7 @@ def color_detection_loop(videostream, center_x, center_y, min_box_area, stop_eve
         deviation_y_yellow = (y_yellow + h_yellow // 2) - center_y if contours_red else 0
         frame_queue.put((frame, mask_red, mask_yellow, status_red, deviation_x_red,deviation_y_red, status_yellow,deviation_x_yellow,deviation_y_yellow,contours_yellow,contours_red, status_blue,None,None,None,None,None,None,None))
 
-        display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [str(status_red), str(status_yellow)], [(x_r, y_r), (x_b, y_b)], center_x, center_y)
+        display_info(frame, 'FPS: {0:.2f}'.format(frame_rate_calc), [str(status_red), str(status_yellow)], [(x_r, y_r), (x_y, y_y)], center_x, center_y)
 
         t2 = cv2.getTickCount()
         frame_rate_calc = calculate_fps(t1, t2, freq)

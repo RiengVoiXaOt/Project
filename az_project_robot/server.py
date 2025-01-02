@@ -18,9 +18,9 @@ def gen_frames(mode):
         if not frame_q.empty():
             frame_data = frame_q.get()
             if mode == "color":
-                output_frame = frame_data[0]  # Assuming frame_data[0] is the color frame
+                output_frame = frame_data[1]  # Assuming frame_data[0] is the color frame
             elif mode == "object":
-                output_frame = frame_data[17]  # Assuming frame_data[1] is the object frame
+                output_frame = frame_data[18]  # Assuming frame_data[1] is the object frame
             else:
                 output_frame = None
             if output_frame is not None:

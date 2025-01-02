@@ -16,15 +16,23 @@ def process_frame(frame):
     """
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # Mask màu đỏ
-    lower_red1 = np.array([0, 100, 50])  # Giảm S và V để bao quát màu tối hơn
-    upper_red1 = np.array([10, 255, 255])  # Giữ nguyên mức trên
+    # lower_red1 = np.array([0, 100, 50])  # Giảm S và V để bao quát màu tối hơn
+    # upper_red1 = np.array([10, 255, 255])  # Giữ nguyên mức trên
 
-    lower_red2 = np.array([170, 100, 50])  # Giảm S và V
-    upper_red2 = np.array([180, 255, 255])  # Giữ nguyên mức trên
+    # lower_red2 = np.array([170, 100, 50])  # Giảm S và V
+    # upper_red2 = np.array([180, 255, 255])  # Giữ nguyên mức trên
 
-    mask1_red = cv2.inRange(hsv, lower_red1, upper_red1)
+    # mask1_red = cv2.inRange(hsv, lower_red1, upper_red1)
+    # mask2_red = cv2.inRange(hsv, lower_red2, upper_red2)
+    # mask_red = mask1_red + mask2_red 
+    
+    lower_red = np.array([0, 120, 70])
+    upper_red = np.array([10, 255, 255])
+    mask1_red = cv2.inRange(hsv, lower_red, upper_red)
+    lower_red2 = np.array([170, 120, 70])
+    upper_red2 = np.array([180, 255, 255])
     mask2_red = cv2.inRange(hsv, lower_red2, upper_red2)
-    mask_red = mask1_red + mask2_red 
+    mask_red = mask1_red + mask2_red
 
     # Mask for yellow (adjusted for bright yellow only)
     lower_yellow = np.array([15, 100, 100])  # Reduced S and V values for lighter shades
